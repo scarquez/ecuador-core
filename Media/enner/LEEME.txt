@@ -1,0 +1,12 @@
+GALERÍA DE ENNER VALENCIA — +593 CORE
+======================================
+Guarda aquí los memes con numeración secuencial (el orden = orden de subida):
+
+  enner-01.jpg   ← el meme "No me estarán haciendo memes / Que debo concentrarme"
+  enner-02.jpg
+  enner-03.mp4   (también acepta videos)
+  ...
+
+Luego agrega cada uno al array `gallery` de la entrada 'enner' en
+ecuadorcore-final.html (busca CORE593). Los nuevos SIEMPRE se agregan
+al final del array — nunca reemplazan a los anteriores.
