@@ -1,0 +1,2195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>EcuadorCore — ¿Qué es un Ecuador?</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<style>
+  :root{
+    --ec-amarillo:#FFDD00;
+    --ec-azul:#4D9BFF;
+    --ec-rojo:#FF3B4E;
+    --ink:#0b0f1e;
+    --shadow-sm:0 8px 20px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;margin:0;overflow:hidden;background:#000208;
+    font-family:'Trebuchet MS','Segoe UI',system-ui,-apple-system,sans-serif;color:#fff;}
+
+  /* ============ ESCENA 3D (una sola, nunca se corta) ============ */
+  #space{position:fixed;inset:0;display:block;transition:filter 1.6s ease;}
+  #space.dof{filter:blur(3px) brightness(.55) saturate(1.2);}
+
+  #warm{
+    position:fixed;inset:0;pointer-events:none;z-index:3;opacity:0;
+    background:
+      radial-gradient(90vmax 70vmax at 50% 62%, rgba(255,150,40,.22), transparent 60%),
+      radial-gradient(120vmax 90vmax at 50% 40%, rgba(255,200,80,.10), transparent 65%),
+      radial-gradient(ellipse at 50% 50%, transparent 45%, rgba(0,2,8,.75) 100%);
+    transition:opacity 1.8s ease;
+  }
+  #warm.on{opacity:1;}
+
+  /* ============ SILUETA DE ECUADOR ============ */
+  #sil{
+    position:fixed;z-index:2;pointer-events:none;left:0;top:0;opacity:0;
+    transform:translate(-50%,-50%);will-change:transform,opacity,width;
+    filter:drop-shadow(0 0 34px rgba(255,183,3,.35)) drop-shadow(0 0 90px rgba(255,120,20,.22));
+  }
+  #sil svg{display:block;width:100%;height:auto;overflow:visible;}
+  #sil.hero{transition:opacity 1.2s ease;}
+  #sil.dimmed{opacity:.14 !important;transition:opacity 1.4s ease, width 1.4s ease;}
+  /* Islas Galápagos: parte de la silueta (no un botón flotante), clic habilitado solo aquí */
+  #sil .galapagos-hit{
+    pointer-events:auto;cursor:pointer;
+    transform-box:fill-box;transform-origin:center;
+    transition:transform .25s ease, filter .25s ease;
+  }
+  #sil .galapagos-hit:hover{transform:scale(1.14);filter:brightness(1.18);}
+
+  /* ============ UI ESPACIO ============ */
+  #titleUI{
+    position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:36px;text-align:center;padding:20px;
+    transition:opacity 1s ease;
+  }
+  #titleUI.hide{opacity:0;pointer-events:none;}
+  #bigQ{
+    margin:0;font-weight:900;line-height:1.04;letter-spacing:2px;
+    font-size:clamp(40px,9vw,116px);color:var(--ec-amarillo);
+    text-shadow:0 0 60px rgba(255,221,0,.35), 0 6px 40px rgba(0,0,0,.85);
+    animation:titleIn 1.6s .3s cubic-bezier(.2,.9,.3,1.15) both;
+  }
+  @keyframes titleIn{from{opacity:0;transform:translateY(30px) scale(.95);letter-spacing:10px;}to{opacity:1;transform:none;letter-spacing:2px;}}
+  #goBtn{
+    border:none;cursor:pointer;font-family:inherit;font-weight:900;
+    font-size:clamp(15px,2.2vw,21px);letter-spacing:3px;
+    padding:16px 46px;border-radius:999px;color:var(--ink);
+    background:linear-gradient(135deg,var(--ec-amarillo),#ffc400);
+    box-shadow:0 10px 40px rgba(255,221,0,.35);
+    animation:titleIn 1.4s 1s cubic-bezier(.2,.9,.3,1.15) both, glowPulse 2.4s 2.4s ease-in-out infinite;
+    transition:transform .15s ease, opacity .4s ease;
+  }
+  #goBtn:hover{transform:scale(1.07);}
+  #goBtn:active{transform:scale(.94);}
+  #goBtn:disabled{opacity:.45;cursor:wait;animation:none;}
+  @keyframes glowPulse{0%,100%{box-shadow:0 10px 40px rgba(255,221,0,.35);}50%{box-shadow:0 10px 64px rgba(255,221,0,.7);}}
+
+  /* ============ TIPOGRAFÍA ECUADOR ============ */
+  #phrase{
+    position:fixed;inset:0;z-index:5;display:none;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center;padding:24px;
+    pointer-events:none;
+  }
+  #phrase.show{display:flex;}
+  .pl{opacity:0;margin:0;will-change:transform,opacity;}
+  .pl.animIn{animation:lineIn 1s cubic-bezier(.16,.9,.28,1.2) forwards;}
+  @keyframes lineIn{
+    from{opacity:0;transform:translateY(44px) scale(.92);filter:blur(6px);}
+    to{opacity:1;transform:none;filter:blur(0);}
+  }
+  .pl.small{font-size:clamp(17px,3vw,32px);font-weight:700;color:#ffeccf;letter-spacing:5px;}
+  .pl.yellow{
+    font-size:clamp(30px,6.4vw,74px);font-weight:900;line-height:1.06;letter-spacing:1px;
+    color:var(--ec-amarillo);text-shadow:0 0 46px rgba(255,221,0,.5),0 6px 22px rgba(0,0,0,.75);
+    margin-top:14px;
+  }
+  .pl.blue{
+    font-size:clamp(25px,5.2vw,60px);font-weight:900;letter-spacing:1px;
+    color:var(--ec-azul);text-shadow:0 0 40px rgba(77,155,255,.55),0 6px 22px rgba(0,0,0,.75);
+    margin-top:10px;
+  }
+  .pl.red{
+    font-size:clamp(30px,6.4vw,74px);font-weight:900;letter-spacing:1px;
+    color:var(--ec-rojo);text-shadow:0 0 46px rgba(255,59,78,.55),0 6px 22px rgba(0,0,0,.75);
+    margin-top:10px;
+  }
+  .pl.code{
+    display:inline-block;font-size:clamp(14px,2vw,20px);font-weight:900;letter-spacing:4px;
+    color:var(--ink);background:linear-gradient(135deg,var(--ec-amarillo),#ffc400);
+    padding:8px 22px;border-radius:999px;margin-top:30px;
+    box-shadow:0 10px 30px rgba(255,183,3,.4);
+  }
+  .pl.code.animIn{animation:lineIn 1s cubic-bezier(.16,.9,.28,1.2) forwards, float593 3.4s 1.2s ease-in-out infinite;}
+  @keyframes float593{0%,100%{transform:translateY(0);}50%{transform:translateY(-9px);}}
+  /* la frase se disuelve suavemente (una sola aparición) */
+  #phrase{transition:opacity 1.15s ease, filter 1.15s ease, transform 1.15s ease;}
+  #phrase.dissolve{opacity:0;filter:blur(10px);transform:scale(1.06);}
+
+  /* ============ BURBUJAS ============ */
+  /* el contenedor NO captura clics: solo las burbujas (evita bloquear botones debajo) */
+  #world{position:fixed;inset:0;z-index:6;display:none;pointer-events:none;}
+  #world.on{display:block;}
+  .bubble{
+    pointer-events:auto;
+    position:absolute;top:0;left:0;
+    display:flex;align-items:center;justify-content:center;text-align:center;
+    border-radius:50%;padding:10px;
+    font-weight:900;line-height:1.12;letter-spacing:.4px;color:#fff;cursor:grab;
+    box-shadow:0 14px 40px rgba(0,0,0,.5), inset 0 -12px 26px rgba(0,0,0,.25), inset 0 12px 26px rgba(255,255,255,.3);
+    will-change:transform;user-select:none;-webkit-user-select:none;
+    text-shadow:0 1px 3px rgba(0,0,0,.3);
+  }
+  .bubble:active{cursor:grabbing;}
+  .bubble .emoji{font-size:1.7em;display:block;margin-bottom:4px;}
+  /* nacimiento: solo opacidad aquí; la escala la maneja el motor (sin conflictos de transform) */
+  .bubble.born,.bubble.pop{animation:bornFade .45s ease;}
+  @keyframes bornFade{from{opacity:0;}to{opacity:1;}}
+  .bubble.inkText{color:var(--ink);text-shadow:0 1px 2px rgba(255,255,255,.3);}
+
+  /* ============ UI universo ============ */
+  .topbar{
+    position:fixed;top:0;left:0;right:0;z-index:40;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 18px;pointer-events:none;
+    opacity:0;transition:opacity .9s ease;
+  }
+  .topbar.show{opacity:1;}
+  .brand{
+    pointer-events:auto;font-weight:900;font-size:19px;letter-spacing:.5px;
+    background:rgba(255,255,255,.1);padding:7px 16px;border-radius:999px;
+    box-shadow:var(--shadow-sm);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.15);
+  }
+  .brand span{color:var(--ec-amarillo);}
+  .controls{display:flex;gap:10px;pointer-events:auto;flex-wrap:wrap;justify-content:flex-end;}
+  .btn{
+    border:none;cursor:pointer;font-family:inherit;font-weight:800;font-size:14px;
+    padding:10px 16px;border-radius:999px;color:#fff;
+    box-shadow:var(--shadow-sm);transition:transform .12s ease, filter .12s ease;
+  }
+  .btn:hover{transform:translateY(-2px) scale(1.03);filter:brightness(1.1);}
+  .btn:active{transform:scale(.95);}
+  .btn.shuffle{background:linear-gradient(135deg,#1a6fd6,var(--ec-azul));}
+  .btn.more{background:linear-gradient(135deg,#d62839,var(--ec-rojo));}
+
+  /* ============ EL MUSEO: VELO + SALAS ============ */
+  #roomVeil{
+    position:fixed;z-index:43;width:120px;height:120px;border-radius:50%;
+    left:0;top:0;transform:translate(-50%,-50%) scale(0);opacity:0;pointer-events:none;
+    transition:transform .8s cubic-bezier(.6,.05,.3,1), opacity .5s ease;
+    will-change:transform;
+  }
+  #room{
+    position:fixed;inset:0;z-index:44;display:none;overflow:hidden;
+  }
+  #room.open{display:block;}
+  #roomHead{
+    position:fixed;top:0;left:0;right:0;z-index:49;   /* SIEMPRE sobre las burbujas de la sala */
+    display:flex;align-items:center;gap:16px;padding:14px 18px;
+    opacity:0;visibility:hidden;transition:opacity .6s ease .25s, visibility 0s .85s;
+    pointer-events:none;
+  }
+  #roomHead.show{opacity:1;visibility:visible;transition:opacity .6s ease .25s, visibility 0s;}
+  #backLobby{
+    pointer-events:auto;border:none;cursor:pointer;font-family:inherit;font-weight:900;
+    font-size:13.5px;letter-spacing:2px;padding:10px 18px;border-radius:999px;
+    color:#fff;background:rgba(0,0,0,.32);backdrop-filter:blur(8px);
+    border:1px solid rgba(255,255,255,.28);transition:transform .12s ease;
+  }
+  #backLobby:hover{transform:translateX(-3px);}
+  .roomTitle{display:flex;align-items:center;gap:12px;pointer-events:auto;}
+  .roomTitle #roomEmoji{font-size:34px;line-height:1;filter:drop-shadow(0 4px 10px rgba(0,0,0,.4));}
+  .roomTitle h3{margin:0;font-size:clamp(16px,2.6vw,24px);font-weight:900;letter-spacing:1.5px;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.5);}
+  .roomTitle p{margin:2px 0 0;font-size:12.5px;font-weight:700;letter-spacing:1px;color:rgba(255,255,255,.75);}
+  #roomBody{
+    position:absolute;inset:0;overflow-y:auto;overscroll-behavior:contain;
+    padding:96px 20px 40px;
+    opacity:0;transition:opacity .6s ease .3s;
+  }
+  #room.open #roomBody{opacity:1;}
+  #world.inRoom{z-index:45;}   /* sala-patio: las burbujas flotan dentro de la sala */
+
+  /* piezas de la exhibición */
+  .tiles{display:grid;gap:14px;max-width:1100px;margin:0 auto;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));}
+  .tile{
+    border:none;cursor:pointer;font-family:inherit;text-align:left;
+    border-radius:20px;padding:20px;min-height:110px;
+    display:flex;flex-direction:column;justify-content:center;gap:6px;
+    transition:transform .16s ease, box-shadow .16s ease;
+    animation:tileIn .55s cubic-bezier(.2,.9,.3,1.15) both;
+  }
+  .tile:hover{transform:translateY(-4px) scale(1.02);}
+  .tile:active{transform:scale(.97);}
+  @keyframes tileIn{from{opacity:0;transform:translateY(26px) scale(.95);}to{opacity:1;transform:none;}}
+  .tile .tEmoji{font-size:30px;line-height:1;}
+  .tile .tName{font-weight:900;font-size:17px;line-height:1.2;}
+
+  /* --- lenguaje visual de cada sala --- */
+  #room.theme-decimos{background:linear-gradient(160deg,#fff6ec,#ffe3ea 55%,#ffd2dd);}
+  #roomHead.theme-decimos .roomTitle h3,#roomHead.theme-decimos .roomTitle p{color:#8d1636;text-shadow:none;}
+  #roomHead.theme-decimos #backLobby{background:rgba(141,22,54,.85);border-color:rgba(141,22,54,.4);}
+  #room.theme-decimos .tile{background:#fffdf8;color:#2a0e18;box-shadow:0 10px 26px rgba(141,22,54,.14);}
+  #room.theme-decimos .tile .tName{font-size:21px;color:#c81e4f;}     /* tipografía primero */
+  #room.theme-decimos .tile .tEmoji{font-size:22px;}
+
+  #room.theme-comida{background:radial-gradient(120vmax 90vmax at 50% -20%, #ff9e3d, #e2551b 55%, #a92c0e);}
+  #room.theme-comida .tile{background:rgba(255,250,240,.94);color:#5a1d05;box-shadow:0 12px 28px rgba(60,10,0,.3);align-items:center;text-align:center;}
+  #room.theme-comida .tile .tEmoji{font-size:44px;}
+
+  #room.theme-hacemos{background:radial-gradient(100vmax 80vmax at 50% 110%, #ffd166, #e6a800 60%, #9a6b00);}
+  /* notas adhesivas de la sala ECUATORIANO QUE SE RESPETA... */
+  .stickers{display:grid;gap:16px;max-width:1050px;margin:0 auto;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));}
+  .sticker{
+    border:none;cursor:pointer;font-family:inherit;text-align:left;
+    background:#fffdf2;color:#4a3a10;
+    border-radius:4px 20px 4px 20px;
+    padding:16px;min-height:104px;
+    box-shadow:0 12px 24px rgba(90,60,0,.32);
+    transform:rotate(var(--rot,0deg));
+    display:flex;gap:11px;align-items:flex-start;
+    animation:tileIn .5s cubic-bezier(.2,.9,.3,1.15) both, stickerBob 5.5s ease-in-out infinite;
+    transition:transform .16s ease, box-shadow .16s ease;
+  }
+  .sticker:hover{transform:rotate(0deg) translateY(-5px) scale(1.03);box-shadow:0 18px 32px rgba(90,60,0,.4);}
+  .sticker:active{transform:scale(.97);}
+  @keyframes stickerBob{0%,100%{translate:0 0;}50%{translate:0 -5px;}}
+  .sticker .check{
+    font-weight:900;font-size:17px;color:#0a9958;background:#e2f9e8;
+    border-radius:50%;width:30px;height:30px;min-width:30px;
+    display:flex;align-items:center;justify-content:center;margin-top:2px;
+  }
+  .sticker .sBody{display:flex;flex-direction:column;gap:5px;}
+  .sticker .sEmoji{font-size:24px;line-height:1;}
+  .sticker .sName{font-weight:800;font-size:14.5px;line-height:1.35;}
+
+  #room.theme-madein{background:linear-gradient(170deg,#3d0a14,#6e1020 55%,#8f1626);}
+  #room.theme-madein .tile{
+    background:linear-gradient(160deg,#fff8ee,#ffe9d0);color:#4a0d16;
+    border:2px solid #d4a04c;box-shadow:0 14px 30px rgba(0,0,0,.4);align-items:center;text-align:center;
+  }
+  #room.theme-madein .tile .tEmoji{font-size:40px;}
+  /* variante con foto real: mismo marco de tarjeta, solo cambia el contenido interior */
+  #room.theme-madein .tile.hasphoto{justify-content:center;gap:10px;}
+  #room.theme-madein .tile .tPhoto{
+    width:76px;height:76px;border-radius:50%;object-fit:cover;
+    border:3px solid #d4a04c;box-shadow:0 8px 20px rgba(0,0,0,.35);
+  }
+  #room.theme-madein .tile .tPhoto-fallback{
+    width:76px;height:76px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:32px;border:3px solid #d4a04c;
+    background:repeating-linear-gradient(45deg,#fff8ee,#fff8ee 8px,#ffe9d0 8px,#ffe9d0 16px);
+  }
+  #room.theme-madein .tile .tName{text-align:center;}
+
+  #room.theme-core{background:radial-gradient(110vmax 80vmax at 50% 0%, #0b3d2b, #052018 60%, #01100b);}
+  #room.theme-core .tile{
+    background:#0f5c3f;color:#c7ffe3;border:1.5px solid #2fd48f;
+    box-shadow:0 0 22px rgba(47,212,143,.25);
+  }
+  #room.theme-core .tile:nth-child(odd){transform:rotate(-1.3deg);}
+  #room.theme-core .tile:nth-child(even){transform:rotate(1.1deg);}
+  #room.theme-core .tile:hover{transform:rotate(0) translateY(-4px) scale(1.03);}
+
+  #room.theme-lugares{background:linear-gradient(180deg,#04263f,#0b4a6e 60%,#0e6288);}
+  #room.theme-lugares .tile{
+    background:rgba(255,255,255,.95);color:#093046;
+    box-shadow:0 12px 30px rgba(0,10,25,.45);border-bottom:5px solid #25b6da;
+  }
+  #room.theme-lugares .tile .tEmoji{font-size:36px;}
+
+  #room.theme-facts{background:radial-gradient(100vmax 70vmax at 50% -10%, #2a1650, #160a30 60%, #090318);}
+  #room.theme-facts .tile{
+    background:rgba(255,255,255,.07);color:#e9ddff;border:1px solid rgba(181,123,255,.4);
+    box-shadow:0 0 26px rgba(131,56,236,.22);backdrop-filter:blur(4px);
+  }
+
+  #hint{
+    position:fixed;left:50%;bottom:44px;transform:translateX(-50%);z-index:52;
+    background:rgba(255,255,255,.92);color:var(--ink);padding:9px 18px;border-radius:999px;
+    font-size:13.5px;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.4);
+    pointer-events:none;opacity:0;transition:opacity .5s ease;white-space:nowrap;max-width:92vw;
+  }
+  #hint.show{opacity:1;}
+
+  /* ============ MODAL MULTIMEDIA ============ */
+  .overlay{
+    position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;
+    background:rgba(2,4,12,.6);backdrop-filter:blur(6px);padding:20px;
+  }
+  .overlay.show{display:flex;animation:fadeIn .25s ease;}
+  @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+  .modal{
+    background:#fffdf7;color:var(--ink);border-radius:26px;max-width:480px;width:100%;
+    box-shadow:0 24px 60px rgba(0,0,0,.5);padding:26px;position:relative;text-align:center;
+    animation:rise .3s cubic-bezier(.2,.9,.3,1.3);
+    max-height:88vh;overflow:auto;overscroll-behavior:contain;
+  }
+  @keyframes rise{from{transform:translateY(30px) scale(.95);opacity:0;}to{transform:none;opacity:1;}}
+  .modal .emoji-big{font-size:52px;line-height:1;margin-bottom:10px;}
+  .modal h2{margin:0 0 8px;font-size:26px;}
+  .modal p{font-size:15.5px;line-height:1.5;color:#4a4a5a;margin:6px 0 20px;}
+  .modal .tag{
+    display:inline-block;font-size:12px;font-weight:900;letter-spacing:1px;text-transform:uppercase;
+    color:#fff;padding:5px 14px;border-radius:999px;margin-bottom:12px;
+  }
+  .mtabs{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:12px 0 12px;}
+  .mtab{
+    position:relative;border:none;cursor:pointer;font-family:inherit;font-weight:800;font-size:12.5px;
+    padding:7px 12px;border-radius:999px;background:#f2ecf7;color:var(--ink);
+    transition:transform .1s, background .15s, color .15s;
+  }
+  .mtab:hover{transform:translateY(-1px);}
+  .mtab.on{background:linear-gradient(135deg,var(--ec-azul),#1a6fd6);color:#fff;}
+  .mtab .dotlive{
+    position:absolute;top:-2px;right:-2px;width:9px;height:9px;border-radius:50%;
+    background:var(--ec-rojo);border:2px solid #fffdf7;
+  }
+  .mbody{min-height:170px;margin-bottom:8px;}
+  .mph{
+    width:100%;height:170px;border-radius:16px;border:2px dashed #c9c2da;
+    background:repeating-linear-gradient(45deg,#f4f1fa,#f4f1fa 12px,#ece7f5 12px,#ece7f5 24px);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
+    color:#8a7a9a;font-weight:800;font-size:13px;padding:10px;
+  }
+  .mph .cam{font-size:28px;}
+  .mframe{width:100%;border:0;border-radius:16px;background:#000;display:block;}
+  /* galería swipeable: desliza con el dedo o la rueda, con snap por meme */
+  .gal{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;}
+  .gal img{height:190px;max-width:88%;border-radius:14px;flex:0 0 auto;object-fit:cover;scroll-snap-align:center;cursor:zoom-in;}
+  .gal video{height:190px;max-width:88%;border-radius:14px;flex:0 0 auto;background:#000;scroll-snap-align:center;}
+  .gal .galph{
+    flex:0 0 220px;height:190px;border-radius:14px;border:2px dashed #c9c2da;background:#f4f1fa;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+    color:#8a7a9a;font-weight:800;font-size:12px;text-align:center;padding:12px;scroll-snap-align:center;
+  }
+  .gal .galph .cam{font-size:26px;}
+
+  /* lightbox: zoom de memes a pantalla completa */
+  #lightbox{
+    position:fixed;inset:0;z-index:70;display:none;
+    background:rgba(2,4,12,.92);backdrop-filter:blur(8px);
+  }
+  #lightbox.show{display:block;animation:fadeIn .2s ease;}
+  #lbScroll{position:absolute;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;}
+  #lbImg{
+    max-width:92vw;max-height:86vh;border-radius:10px;cursor:zoom-in;display:block;margin:auto;
+    box-shadow:0 30px 80px rgba(0,0,0,.6);transition:max-width .25s ease, max-height .25s ease;
+  }
+  #lightbox.zoomed #lbImg{max-width:220vw;max-height:none;cursor:zoom-out;border-radius:0;}
+  #lbClose{
+    position:fixed;top:16px;right:16px;z-index:71;border:none;cursor:pointer;
+    width:44px;height:44px;border-radius:50%;font-size:19px;font-weight:900;font-family:inherit;
+    background:rgba(255,255,255,.92);color:var(--ink);box-shadow:0 8px 24px rgba(0,0,0,.5);
+  }
+  #lbCap{
+    position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:71;max-width:92vw;
+    background:rgba(255,255,255,.92);color:var(--ink);padding:8px 16px;border-radius:999px;
+    font-size:13px;font-weight:800;text-align:center;
+  }
+  #lbCap:empty{display:none;}
+  .modal .quote{
+    font-size:17px;font-weight:800;font-style:italic;line-height:1.4;color:#1c4532;
+    background:#e9f9ef;border-left:4px solid #06b26a;border-radius:0 14px 14px 0;
+    padding:12px 16px;margin:2px 0 14px;text-align:left;
+  }
+  .gal .ph{
+    flex:0 0 126px;height:170px;border-radius:14px;border:2px dashed #c9c2da;
+    background:#f4f1fa;display:flex;align-items:center;justify-content:center;font-size:26px;
+  }
+  .mbody audio{width:100%;margin-top:8px;}
+  .mcap{font-size:12px;color:#8a7a9a;margin-top:7px;font-weight:700;}
+  .mcap a{color:var(--ec-azul);text-decoration:none;font-weight:800;}
+  /* cartas de significado (categorías de texto) */
+  .meaning{display:flex;flex-direction:column;gap:10px;margin:4px 0 16px;text-align:left;}
+  .mrow{background:#f6f2fb;border-radius:16px;padding:14px 16px;}
+  .mrow h5{margin:0 0 4px;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#8a7a9a;}
+  .mrow p{margin:0;font-size:14.5px;line-height:1.5;color:#3d3d50;}
+  .related{margin-top:14px;}
+  .related h4{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#8a7a9a;}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:6px;}
+  .chip{
+    background:#f2ecf7;border:none;font-family:inherit;font-weight:800;font-size:13px;
+    padding:8px 14px;border-radius:999px;cursor:pointer;color:var(--ink);
+    transition:transform .1s, background .15s;
+  }
+  .chip:hover{background:#e6dcf2;transform:translateY(-1px);}
+  .modal .close-btn{
+    width:100%;border:none;cursor:pointer;font-family:inherit;font-weight:900;font-size:15px;
+    padding:13px;border-radius:14px;color:#fff;
+    background:linear-gradient(135deg,var(--ec-azul),#1a6fd6);box-shadow:var(--shadow-sm);
+  }
+
+  @media (max-width:640px){
+    .brand{font-size:15px;}
+    .btn{font-size:12.5px;padding:9px 12px;}
+  }
+
+  /* ============ LUGARES: destino visual (tarjetas con foto real) ============
+     Scoped a esta sala — no toca .tile/.tiles genéricos de otras salas. */
+  .place-grid{display:grid;gap:18px;max-width:1100px;margin:0 auto;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));}
+  .place-card{
+    position:relative;border:none;cursor:pointer;font-family:inherit;padding:0;
+    border-radius:20px;overflow:hidden;aspect-ratio:4/5;background:#0b4a6e;
+    box-shadow:0 14px 32px rgba(0,10,25,.5);
+    animation:tileIn .55s cubic-bezier(.2,.9,.3,1.15) both;
+    transition:transform .18s ease, box-shadow .18s ease;
+  }
+  .place-card:hover{transform:translateY(-6px) scale(1.03);box-shadow:0 20px 44px rgba(0,10,25,.6);}
+  .place-card:active{transform:scale(.97);}
+  .place-card img{
+    position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;
+    transition:transform .5s ease;
+  }
+  .place-card:hover img{transform:scale(1.08);}
+  .place-card .pc-fallback{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:42px;
+    background:repeating-linear-gradient(45deg,#0b4a6e,#0b4a6e 12px,#0e6288 12px,#0e6288 24px);
+  }
+  .place-card .pc-veil{position:absolute;inset:0;background:linear-gradient(180deg,transparent 42%,rgba(3,20,35,.9) 100%);}
+  .place-card .pc-name{
+    position:absolute;left:0;right:0;bottom:0;padding:16px 14px;
+    font-weight:900;font-size:16.5px;line-height:1.2;color:#fff;text-shadow:0 2px 10px rgba(0,0,0,.6);
+  }
+
+  /* ---- carta completa de un lugar (hero/galería + descripción + dato + mapa) ---- */
+  .pcard-hero{position:relative;border-radius:18px;overflow:hidden;background:#04263f;margin-bottom:6px;min-height:190px;}
+  .pcard-hero img{width:100%;max-height:340px;object-fit:cover;display:block;cursor:zoom-in;}
+  .pcard-hero .pc-loading,.pcard-hero .pc-broken{
+    position:absolute;inset:0;display:flex;flex-direction:column;gap:6px;align-items:center;justify-content:center;
+    background:repeating-linear-gradient(45deg,#0b4a6e,#0b4a6e 12px,#0e6288 12px,#0e6288 24px);
+    color:#eaf7ff;font-weight:800;font-size:12.5px;text-align:center;padding:12px;min-height:190px;
+  }
+  .pcard-hero .pc-loading .cam,.pcard-hero .pc-broken .cam{font-size:28px;}
+  .pcard-arrow{
+    position:absolute;top:50%;transform:translateY(-50%);z-index:2;
+    width:38px;height:38px;border-radius:50%;border:none;cursor:pointer;
+    background:rgba(0,0,0,.45);color:#fff;font-size:18px;font-weight:900;
+    display:flex;align-items:center;justify-content:center;transition:background .15s ease;
+  }
+  .pcard-arrow:hover{background:rgba(0,0,0,.7);}
+  .pcard-arrow.prev{left:10px;} .pcard-arrow.next{right:10px;}
+  .pcard-counter{
+    position:absolute;right:10px;bottom:10px;z-index:2;
+    background:rgba(0,0,0,.55);color:#fff;font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px;
+  }
+  .pcard-fact{
+    background:#fff6d8;border-left:4px solid #ffb703;border-radius:0 14px 14px 0;
+    padding:12px 16px;margin:6px 0 16px;text-align:left;
+  }
+  .pcard-fact h5{margin:0 0 4px;font-size:11.5px;text-transform:uppercase;letter-spacing:1px;color:#8a6d1a;}
+  .pcard-fact p{margin:0;font-size:14px;line-height:1.5;color:#4a3c10;}
+
+  /* flechas de navegación dentro del lightbox cuando hay galería */
+  .lb-arrow{
+    position:fixed;top:50%;transform:translateY(-50%);z-index:71;border:none;cursor:pointer;
+    width:46px;height:46px;border-radius:50%;font-size:20px;font-weight:900;font-family:inherit;
+    background:rgba(255,255,255,.92);color:var(--ink);box-shadow:0 8px 24px rgba(0,0,0,.5);
+    display:none;align-items:center;justify-content:center;
+  }
+  .lb-arrow.show{display:flex;}
+  .lb-arrow.prev{left:16px;} .lb-arrow.next{right:16px;}
+
+  /* ============ bienvenida de la mascota (Islas Galápagos) ============ */
+  #galWelcome{
+    position:fixed;inset:0;z-index:65;display:none;align-items:center;justify-content:center;
+    background:rgba(2,4,12,.55);backdrop-filter:blur(5px);padding:20px;
+  }
+  #galWelcome.show{display:flex;animation:fadeIn .25s ease;}
+  .gw-card{
+    display:flex;flex-direction:column;align-items:center;gap:16px;
+    animation:gwPop .5s cubic-bezier(.2,.9,.3,1.3);
+    transition:opacity .4s ease, transform .4s ease;
+  }
+  @keyframes gwPop{from{opacity:0;transform:scale(.6) translateY(24px);}to{opacity:1;transform:none;}}
+  /* despedida: un rebote juguetón (como un saludo) y luego se desvanece */
+  .gw-card.bye{animation:gwBye .42s ease forwards;}
+  @keyframes gwBye{
+    0%{transform:scale(1) rotate(0deg);opacity:1;}
+    35%{transform:scale(1.08) rotate(-6deg);opacity:1;}
+    65%{transform:scale(1.03) rotate(5deg);opacity:1;}
+    100%{transform:scale(.82) rotate(0deg);opacity:0;}
+  }
+  .gw-card img{
+    width:168px;height:168px;object-fit:cover;border-radius:50%;
+    border:5px solid var(--ec-amarillo);box-shadow:0 20px 50px rgba(0,0,0,.55);background:#04263f;
+  }
+  .gw-bubble{
+    position:relative;max-width:300px;background:#fffdf7;color:var(--ink);
+    padding:14px 20px;border-radius:20px;font-weight:800;font-size:15.5px;line-height:1.35;
+    text-align:center;box-shadow:0 14px 34px rgba(0,0,0,.4);
+  }
+  .gw-bubble::after{
+    content:'';position:absolute;top:-10px;left:50%;transform:translateX(-50%);
+    border-width:0 10px 12px 10px;border-style:solid;border-color:transparent transparent #fffdf7 transparent;
+  }
+
+  @media (max-width:640px){
+    .place-grid{grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:12px;}
+    .pcard-hero img,.pcard-hero .pc-loading,.pcard-hero .pc-broken{max-height:240px;min-height:150px;}
+  }
+
+  /* ============ GASTRONOMÍA: galería premium tipo Pinterest/Airbnb ============
+     Scoped a esta sala — reutiliza el mismo lenguaje visual (radios, sombras, hovers)
+     ya establecido en LUGARES/MADE IN ECU, sin tocar ningún otro componente. */
+  .gastro-grid{columns:4 230px;column-gap:20px;max-width:1200px;margin:0 auto;}
+  .gastro-card{
+    display:block;width:100%;margin:0 0 20px;break-inside:avoid;border:none;padding:0;
+    font-family:inherit;text-align:left;cursor:pointer;border-radius:20px;overflow:hidden;
+    background:rgba(255,250,240,.96);box-shadow:0 12px 28px rgba(60,10,0,.28);
+    animation:tileIn .55s cubic-bezier(.2,.9,.3,1.15) both;
+    transition:transform .2s ease, box-shadow .2s ease;
+  }
+  .gastro-card:hover{transform:translateY(-6px);box-shadow:0 18px 38px rgba(60,10,0,.36);}
+  .gastro-card:active{transform:scale(.98);}
+  .gastro-card .gc-frame{position:relative;overflow:hidden;background:#e2551b;min-height:120px;}
+  .gastro-card .gc-frame img{
+    width:100%;display:block;object-fit:cover;transition:transform .5s ease;
+  }
+  .gastro-card:hover .gc-frame img{transform:scale(1.06);}
+  .gastro-card .gc-fallback{
+    width:100%;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;
+    padding:14px;text-align:center;color:#fff3e6;font-weight:700;font-size:12.5px;
+    background:repeating-linear-gradient(45deg,#e2551b,#e2551b 12px,#c9450f 12px,#c9450f 24px);
+  }
+  .gastro-card .gc-name{padding:14px 16px;font-weight:900;font-size:16px;color:#5a1d05;}
+
+  .pcard-region{
+    font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;
+    color:#e2551b;margin:0 0 10px;
+  }
+  .pcard-fact.food{background:#fff1e0;border-left-color:#ff8c1a;}
+  .pcard-fact.food h5{color:#a15a06;}
+  .pcard-fact.food p{color:#5a1d05;}
+
+  @media (max-width:640px){
+    .gastro-grid{columns:2 140px;column-gap:12px;}
+    .gastro-card{margin-bottom:12px;border-radius:16px;}
+    .gastro-card .gc-name{padding:10px 12px;font-size:14px;}
+  }
+</style>
+</head>
+<body>
+
+  <canvas id="space"></canvas>
+  <div id="warm"></div>
+
+  <div id="sil">
+    <svg viewBox="-14 -14 268 296" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="gold" x1="0" y1="0" x2="0.6" y2="1">
+          <stop offset="0" stop-color="#ffd75e"/>
+          <stop offset="0.5" stop-color="#ffb703"/>
+          <stop offset="1" stop-color="#e07b00"/>
+        </linearGradient>
+      </defs>
+      <path d="M93,6 L128,16 L152,34 L196,46 L228,62 L238,88 L224,124 L184,160 L136,184 L116,200 L88,240 L68,264 L44,236 L30,242 L38,204 L52,172 L9,152 L12,104 L36,64 L46,40 L62,25 Z"
+        fill="url(#gold)" stroke="#ffdd8a" stroke-width="3"
+        stroke-linejoin="round" stroke-linecap="round" opacity="0.96"/>
+      <!-- Islas Galápagos: al suroeste del continente, misma paleta que la silueta.
+           overflow:visible en #sil svg permite dibujarlas fuera del viewBox sin
+           tocar sus dimensiones (el continente queda exactamente igual). -->
+      <g class="galapagos-hit">
+        <title>Islas Galápagos</title>
+        <!-- recreada a partir de media/galapagos/Captura de pantalla ...png (mapa de referencia):
+             posición relativa, espaciado y proporciones de cada isla se preservaron 1:1,
+             solo escaladas/trasladadas en conjunto; mismo estilo dorado que el continente. -->
+        <path d="M-100.8,296.0 L-100.8,298.4 L-95.3,303.2 L-94.4,308.4 L-95.7,313.2 L-99.3,316.3 L-104.1,317.5 L-108.4,319.3 L-112.9,320.8 L-117.8,319.6 L-122.9,319.3 L-126.9,316.6 L-129.6,312.3 L-132.0,267.5 L-126.9,262.9 L-119.9,261.1 L-112.9,270.5 L-109.9,280.8 L-107.8,283.2 L-106.0,285.0 L-104.1,286.9 L-102.3,288.7 L-100.8,290.8 L-100.8,293.5 Z"
+          fill="url(#gold)" stroke="#ffdd8a" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" opacity="0.9"/>
+        <ellipse cx="-71.0" cy="298.9" rx="9.4" ry="9.7" fill="url(#gold)" stroke="#ffdd8a" stroke-width="1.4" stroke-linejoin="round" opacity="0.9"/>
+        <ellipse cx="-129.5" cy="287.3" rx="7.1" ry="6.4" fill="url(#gold)" stroke="#ffdd8a" stroke-width="1.4" stroke-linejoin="round" opacity="0.9"/>
+        <ellipse cx="-24.0" cy="309.0" rx="9.9" ry="7.1" fill="url(#gold)" stroke="#ffdd8a" stroke-width="1.4" stroke-linejoin="round" opacity="0.9"/>
+        <ellipse cx="-89.0" cy="281.2" rx="8.5" ry="5.9" fill="url(#gold)" stroke="#ffdd8a" stroke-width="1.4" stroke-linejoin="round" opacity="0.9"/>
+        <ellipse cx="-75.6" cy="331.9" rx="3.9" ry="3.6" fill="url(#gold)" stroke="#ffdd8a" stroke-width="1.4" stroke-linejoin="round" opacity="0.9"/>
+        <ellipse cx="-76.1" cy="252.4" rx="3.8" ry="3.2" fill="url(#gold)" stroke="#ffdd8a" stroke-width="1.4" stroke-linejoin="round" opacity="0.9"/>
+        <ellipse cx="-36.1" cy="336.0" rx="3.3" ry="2.1" fill="url(#gold)" stroke="#ffdd8a" stroke-width="1.4" stroke-linejoin="round" opacity="0.9"/>
+        <ellipse cx="-90.3" cy="240.5" rx="1.8" ry="2.6" fill="url(#gold)" stroke="#ffdd8a" stroke-width="1.4" stroke-linejoin="round" opacity="0.9"/>
+        <ellipse cx="-56.5" cy="308.1" rx="1.8" ry="1.5" fill="url(#gold)" stroke="#ffdd8a" stroke-width="1.4" stroke-linejoin="round" opacity="0.9"/>
+        <ellipse cx="-86.9" cy="298.7" rx="1.5" ry="1.5" fill="url(#gold)" stroke="#ffdd8a" stroke-width="1.4" stroke-linejoin="round" opacity="0.9"/>
+        <ellipse cx="-49.5" cy="253.0" rx="1.2" ry="1.4" fill="url(#gold)" stroke="#ffdd8a" stroke-width="1.4" stroke-linejoin="round" opacity="0.9"/>
+      </g>
+    </svg>
+  </div>
+
+  <div id="titleUI">
+    <h1 id="bigQ">¿QUÉ ES UN<br>ECUADOR?</h1>
+    <button id="goBtn" disabled>CLICK AQUÍ</button>
+  </div>
+
+  <div id="phrase">
+    <p class="pl small"  id="l1">el país de los</p>
+    <p class="pl yellow" id="l2">ARRECHOS QUE<br>NUNCA MUEREN</p>
+    <p class="pl blue"   id="l3">Y SI MUEREN</p>
+    <p class="pl red"    id="l4">MUEREN ARRECHOS</p>
+    <p class="pl code"   id="l5">+593</p>
+  </div>
+
+  <div id="world"></div>
+
+  <!-- velo circular: la burbuja se expande y te traga hacia su sala -->
+  <div id="roomVeil"></div>
+
+  <!-- LA SALA: una exhibición inmersiva dentro del museo -->
+  <section id="room" aria-hidden="true">
+    <div id="roomBody"></div>
+  </section>
+  <!-- cabecera FUERA de #room: siempre por encima de las burbujas flotantes -->
+  <header id="roomHead">
+    <button id="backLobby">← VOLVER A ECUADOR</button>
+    <div class="roomTitle">
+      <span id="roomEmoji"></span>
+      <div><h3 id="roomName"></h3><p id="roomTag"></p></div>
+    </div>
+  </header>
+
+  <div class="topbar" id="topbar">
+    <div class="brand">Ecuador<span>Core</span></div>
+    <div class="controls">
+      <button class="btn shuffle" id="shuffle">🔀 Shuffle Ecuador</button>
+      <button class="btn more" id="more">➕ Más Ecuador</button>
+    </div>
+  </div>
+
+  <div id="hint"></div>
+  <div class="overlay" id="overlay"><div class="modal" id="modal"></div></div>
+
+  <!-- lightbox para ver memes con zoom (también navega galerías de lugares) -->
+  <div id="lightbox">
+    <button id="lbClose">✕</button>
+    <button id="lbPrev" class="lb-arrow prev">‹</button>
+    <button id="lbNext" class="lb-arrow next">›</button>
+    <div id="lbScroll"><img id="lbImg" alt="meme"></div>
+    <div id="lbCap"></div>
+  </div>
+
+  <!-- bienvenida juguetona de la mascota al tocar las Islas Galápagos en el mapa -->
+  <div id="galWelcome">
+    <div class="gw-card">
+      <img id="gwMascot" alt="Mascota EcuadorCore">
+      <div class="gw-bubble" id="gwBubble"></div>
+    </div>
+  </div>
+
+<script>
+/* ============================================================
+   EcuadorCore — EXPERIENCIA COMPLETA
+   Una sola cámara. Cero cortes. Cero páginas.
+   espacio → vuelo Google Earth → silueta → frase → palabras-burbuja
+   → evolución a categorías → burbujas hijas → modales multimedia
+   ============================================================ */
+const $=id=>document.getElementById(id);
+const canvas=$('space'), sil=$('sil'), titleUI=$('titleUI'), goBtn=$('goBtn');
+const phrase=$('phrase'), warm=$('warm'), worldEl=$('world'), hintEl=$('hint');
+const topbar=$('topbar');
+function W(){return window.innerWidth;} function H(){return window.innerHeight;}
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const smooth=t=>t*t*(3-2*t);
+const easeZoom=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+
+let phase='space';   // space → zoom → hold → phrase → bubbles
+let webgl=true;
+
+/* ============================================================
+   ÁRBOL DE CONTENIDO (editable)
+   Cada hija: {t, e, d?, rel?, media?, modal?, mundo?, ecuador?}
+   - mundo:   'qué significa para el resto del mundo' (cartas de texto)
+   - ecuador: 'qué significa para un ecuatoriano' (cartas de texto)
+   - modal:   'media' fuerza tabs multimedia en una burbuja individual
+   ESQUEMA media (cada campo activa su tab en el modal):
+   media:{
+     gallery:  [{src:'https://...jpg', cap:'pie de foto'}, ...],
+     video:    {youtube:'VIDEO_ID'}  ó  {src:'https://...mp4'},
+     pinterest:['https://www.pinterest.com/pin/123.../', ...],
+     tiktok:   'https://www.tiktok.com/@user/video/123...',
+     instagram:'https://www.instagram.com/p/CODIGO/'  (o /reel/),
+     audio:    {src:'https://...mp3', title:'Nombre del audio'},
+     map:      {lat:-1.83, lng:-78.18, zoom:13, label:'Nombre del lugar'}
+   }
+   ============================================================ */
+/* ============================================================
+   SALAS DEL MUSEO (Rooms)
+   EcuadorCore es un museo digital interactivo:
+   - El lobby es la silueta de Ecuador con las burbujas en órbita.
+   - Cada burbuja es la ENTRADA a una sala (no una categoría).
+   - Cada sala tiene su propio lenguaje visual (theme), ritmo y layout.
+
+   modal:'media' → cartas con tabs multimedia | modal:'texto' → cartas tipográficas
+   layout:'cards' → salón de piezas en pared | layout:'float' → sala-patio con física
+   Una burbuja individual puede saltarse la regla: modal:'media' o media:{...} en el item.
+   ============================================================ */
+const CATS = [
+  {id:'decimos', label:'EN ECUADOR<br>DECIMOS',              emoji:'🗣️', colors:['#ef476f','#ff7aa2'], modal:'texto',
+   tag:'Habla como ecuatoriano', layout:'float'},
+  {id:'comida',  label:'LA MEJOR<br>GASTRONOMÍA<br>DEL MUNDO', emoji:'🍽️', colors:['#ff8c1a','#ffb347'], modal:'media',
+   tag:'Se come con las manos y con el alma', layout:'cards'},
+  {id:'hacemos', label:'ECUATORIANO QUE<br>SE RESPETA...',   emoji:'😂', colors:['#e6a800','#ffd166'], modal:'texto',
+   tag:'...hace por lo menos la mitad de estas cosas.', layout:'stickers'},
+  {id:'madein',  label:'MADE IN ECU',                        emoji:'❤️', colors:['#d62839','#ff6b6b'], modal:'media',
+   tag:'Orgullo que nació en Ecuador.', layout:'cards'},
+  {id:'core',    label:'+593 CORE',                          emoji:'🇪🇨', colors:['#06b26a','#2fd48f'], modal:'texto',
+   tag:'El archivo vivo del internet ecuatoriano', layout:'float'},
+  {id:'lugares', label:'LUGARES QUE<br>TIENES QUE<br>CONOCER', emoji:'📍', colors:['#118ab2','#25b6da'], modal:'media',
+   tag:'El país de los cuatro mundos', layout:'cards'},
+  {id:'facts',   label:'FACTOS<br>INTERESANTES',             emoji:'🌚', colors:['#8338ec','#b57bff'], modal:'texto',
+   tag:'Datos que no sabías que necesitabas', layout:'cards'}
+];
+const ROOMS=CATS; /* alias: internamente son salas */
+
+/* ============================================================
+   +593 CORE — ARCHIVO VIRAL (editable)
+   Cada entrada soporta:
+   id, title (carta), displayTitle (burbuja), description, porQue,
+   fullPhrase, translation, format, mediaType ('video'|'image'|'media'|'gallery'),
+   mediaStatus ('pending'|'uploaded'|'published'),
+   videoUrl, imageUrl, gallery:[{type:'image'|'video', src, cap}],
+   thumbnail, sourceCredit, caption, placeholderLabel, relatedIds, tags.
+
+   PARA PUBLICAR MEDIA REAL después:
+   1. Sube tu archivo o consigue la URL/ID de YouTube.
+   2. Llena videoUrl / imageUrl / gallery (y thumbnail, caption, sourceCredit).
+   3. Cambia mediaStatus a 'uploaded'.
+   Nada de media está incrustada en la UI: todo sale de aquí.
+   ============================================================ */
+const CORE593=[
+  {id:'amen', emoji:'🎤',
+   title:'¿AMÉN O NO AMÉN?', displayTitle:'¿AMÉN O NO AMÉN?',
+   format:'video', mediaType:'video', mediaStatus:'uploaded',
+   autoplay:true,   /* arranca apenas se abre la carta */
+   description:'Las legendarias entrevistas de José Delgado por las calles de Guayakill.',
+   porQue:'Porque nadie sale igual de una entrevista en la calle. ¿Amén o no amén? Amén.',
+   videoUrl:'media/amen/amen-o-no-amen.mp4', thumbnail:'', caption:'', sourceCredit:'',
+   relatedIds:['yaquechucha','nice','enner'], tags:['entrevistas','guayakill','jose-delgado']},
+
+  {id:'yaquechucha', emoji:'🗯️',
+   title:'¡YA QUÉ CHUCHA!', displayTitle:'¡YA QUÉ CHUCHA!',
+   translation:'«Ya que.»',
+   format:'video', mediaType:'video', mediaStatus:'uploaded',
+   autoplay:true,
+   description:'En Ecuador decimos "ya que chucha" para decir "ya que". Pero Lasso tenía la imagen de ser un banquero muy serio y formal, entonces nadie esperaba escucharlo decir una grosería. Así que se volvió el YA QUE CHUCHA más famoso del país.',
+   porQue:'Porque todos tenemos un momento "ya qué chucha" por lo menos una vez a la semana.',
+   videoUrl:'media/yaquechucha/ya-que-chucha.mp4', thumbnail:'', caption:'', sourceCredit:'',
+   relatedIds:['amen','miedo'], tags:['politica','lasso','viral']},
+
+  {id:'miedo', emoji:'🏛️',
+   title:'MIEDO Y PRESIDENTE', displayTitle:'MIEDO Y PRESIDENTE',
+   fullPhrase:'«Miedo… y presidente, son cosas que no tenemos.»',
+   format:'media', mediaType:'media', mediaStatus:'uploaded',
+   placeholderLabel:'MEDIA PRÓXIMAMENTE',
+   description:'Una frase muy ecuatoriana para burlarnos de la política.<br>También la usamos cuando nos toca afrontar algo como país y decidimos seguir adelante con valentía, improvisación y cero estabilidad presidencial.',
+   porQue:'Porque la decimos cada vez que Ecuador entra en modo "aquí no se rinde nadie".',
+   videoUrl:'', imageUrl:'media/miedo/presidente-y-miedo.jpg', thumbnail:'', caption:'', sourceCredit:'',
+   relatedIds:['nice','ninos'], tags:['politica','meme']},
+
+  {id:'nice', emoji:'🧚🏼',
+   title:"BECAUSE HE'S NICE,\nBECAUSE HE'S HANDSOME", displayTitle:"BECAUSE HE'S NICE, BECAUSE HE'S HANDSOME",
+   format:'video', mediaType:'video', mediaStatus:'uploaded',
+   autoplay:true,
+   description:'Nuestro presidente Nobita: siempre nice y siempre handsome. 🧚🏼<br>Esta frase salió de una entrevista y terminó convirtiéndose en la excusa ecuatoriana perfecta para justificar cualquier cosa sin dar una explicación real.',
+   porQue:"Porque desde entonces todo se justifica igual: because he's nice.",
+   videoUrl:'media/nice/because-hes-nice.mp4', thumbnail:'', caption:'', sourceCredit:'',
+   relatedIds:['ninos','miedo'], tags:['politica','noboa','entrevista']},
+
+  {id:'ninos', emoji:'📺',
+   title:'PARA QUE LOS NIÑOS\nHAGAN EL AMOR', displayTitle:'PARA QUE LOS NIÑOS HAGAN EL AMOR',
+   format:'video', mediaType:'video', mediaStatus:'uploaded',
+   autoplay:true,
+   description:'Lenín Moreno y uno de esos factos rarísimos que soltaba durante entrevistas y discursos.<br>Una frase tan inesperada que el internet ecuatoriano hizo lo único posible:<br>convertirla en meme.',
+   porQue:'Una cita viral que quedó grabada para siempre en la memoria colectiva del internet criollo.',
+   videoUrl:'media/ninos/lenin-core.mp4', thumbnail:'', caption:'', sourceCredit:'',
+   relatedIds:['nice','miedo'], tags:['politica','moreno','viral']},
+
+  {id:'enner', emoji:'⚽',
+   title:'ENNER VALENCIA', displayTitle:'ENNER VALENCIA',
+   format:'gallery', mediaType:'gallery', mediaStatus:'uploaded',
+   placeholderLabel:'LOS MEMES DE ENNER VIENEN EN CAMINO',
+   description:'El GOAT y protagonista oficial de los memes futboleros ecuatorianos.<br>Porque nos ilusiona como nadie y también nos hace sufrir como siempre.<br>Enner aparece en los memes antes, durante y después de cada partido importante.',
+   porQue:'Porque no hay eliminatoria sin memes de Enner. Es ley.',
+   /* GALERÍA APPEND-ONLY: los memes nuevos se agregan AL FINAL de este
+      array (orden de subida = orden en pantalla). Nunca reemplazar. */
+   gallery:[
+     {type:'image', src:'media/enner/enner-01.jpg',
+      cap:'"No me estarán haciendo memes. Que debo concentrarme."'},
+     {type:'image', src:'media/enner/enner-02.jpg',
+      cap:'"Ese palo si a sabido tapar."'}
+   ],
+   thumbnail:'', caption:'', sourceCredit:'',
+   relatedIds:['amen','yaquechucha'], tags:['futbol','la-tri','memes']},
+
+  {id:'viudas', emoji:'💃',
+   title:'VIUDAS DE FIN DE AÑO', displayTitle:'VIUDAS DE FIN DE AÑO',
+   format:'video', mediaType:'video', mediaStatus:'uploaded',
+   autoplay:true,
+   description:'Cada 31 de diciembre, las "viudas" del año viejo salen a llorar a su difunto... y a cobrar peaje en cada esquina del país.<br>Tacones, peluca, media nylon y cero vergüenza: una tradición nacional que hay que ver para creer.',
+   porQue:'Porque no existe fin de año ecuatoriano sin una viuda parando el tráfico.',
+   videoUrl:'media/viudas/carrera-de-viudas.mp4', thumbnail:'', caption:'', sourceCredit:'',
+   relatedIds:['amen','enner'], tags:['tradicion','fin-de-ano','viudas']}
+];
+const C593={}; CORE593.forEach(en=>C593[en.id]=en);
+
+const DATA = {
+  decimos:[
+    {t:'Chulla vida', e:'🎉',
+      mundo:'Solo se vive una vez.',
+      ecuador:'Básicamente nuestro permiso oficial para tomar decisiones buenas... y también unas cuantas malas.<br>Si vale la pena la anécdota, entonces chulla vida.'},
+    {t:'Achachay', e:'🥶',
+      mundo:'Hace mucho frío.',
+      ecuador:'Si escuchas un "¡Achachay!", probablemente alguien acaba de sentir el frío de la Sierra hasta en los huesos.'},
+    {t:'Mande', e:'👂',
+      mundo:'¿Qué?',
+      ecuador:'Es la forma más común de responder cuando alguien nos llama o quiere decirnos algo.<br>Y sí... seguimos diciéndolo muchísimo.'},
+    {t:'No sea malito', e:'🙏',
+      mundo:'Por favor.',
+      ecuador:'Nuestra manera elegante de pedir un favor.<br>Porque pedirlo normal... no tiene el mismo efecto.'},
+    {t:'Ponte pilas', e:'🔋',
+      mundo:'Presta atención.',
+      ecuador:'Es momento de reaccionar.<br>De moverte.<br>De dejar de hacerte el loco.'},
+    {t:'Qué bacán', e:'😎',
+      mundo:'¡Qué genial!',
+      ecuador:'Si algo nos encanta, nos emociona o sale increíble...<br>Simplemente está bacán.'},
+    {t:'Qué salado', e:'🧂',
+      mundo:'Qué mala suerte.',
+      ecuador:'Cuando la vida decide no colaborar contigo.'},
+    {t:'Chuta', e:'😬',
+      mundo:'Vaya...',
+      ecuador:'La usamos cuando algo nos sorprende, sale mal o simplemente nos deja sin palabras.'},
+    {t:'De ley', e:'💯',
+      mundo:'Claro que sí.',
+      ecuador:'No hay dudas.<br>Va.<br>De una.<br>De ley.'},
+    {t:'Me la saco como José Delgado', e:'🧤',
+      mundo:'Ya me voy.',
+      ecuador:'Cuando ya cumpliste con tu misión y es hora de desaparecer discretamente...<br>...o no tan discretamente.'},
+    {t:'La culpa es de Correa', e:'🤷',
+      mundo:'Todo es culpa de Correa.',
+      ecuador:'¿Subió el precio?<br>¿Se dañó algo?<br>¿Perdió tu equipo?<br>Siempre habrá alguien que diga:<br>"La culpa es de Correa."'},
+    {t:'¿Qué, viene con música tu huevada?', e:'💸',
+      mundo:'Está demasiado caro.',
+      ecuador:'Cuando ves el precio de algo y esperabas que, por ese valor, al menos viniera con concierto incluido.'},
+    {t:'Confirma para confirmar', e:'✅',
+      mundo:'Confírmame si vas.',
+      ecuador:'Porque una confirmación nunca es suficiente.'},
+    {t:'La plena', e:'🗣️',
+      mundo:'En serio.<br>La verdad.',
+      ecuador:'Cuando quieres que todos sepan que hablas completamente en serio.'},
+    {t:'Dame la yapa', e:'➕',
+      mundo:'¿Me das un poquito más?',
+      ecuador:'Comprar algo y no pedir la yapa...<br>...es casi perder una tradición nacional.'},
+    {t:'Ñaño', e:'👬',
+      mundo:'Hermano.',
+      ecuador:'Qué tierno.<br>Aquí "ñaño" puede ser tu hermano, tu mejor amigo, el señor de la tienda, el taxista o el pana que acabas de conocer hace cinco minutos.<br>Si hay confianza...<br>Ya eres ñaño.'},
+    {t:'Sapo', e:'🐸',
+      mundo:'Chismoso.',
+      ecuador:'La persona que se mete donde no la llaman o anda contando lo que no debía.'},
+    {t:'Ahorita', e:'⏰',
+      mundo:'Ahora mismo.',
+      ecuador:'Puede significar en este instante, después, más tarde o cuando la persona finalmente se acuerde.<br>Espérese nomás.'},
+    {t:'Ya mismo', e:'⏳',
+      mundo:'Enseguida.',
+      ecuador:'Una expresión muy optimista con una relación bastante flexible con el tiempo.'},
+    {t:'Vamos por unas bielas', e:'🍻',
+      mundo:'Vamos por unas cervezas.',
+      ecuador:'Porque casi nadie dice "cervezas".<br>Vamos por unas bielas.'},
+    {t:'Lámpara', e:'💡',
+      mundo:'Alguien intenso, exagerado o que llama demasiado la atención.',
+      ecuador:'Puede ser alguien que hace demasiado, exagera, se pone raro o simplemente no da buena espina.<br>También se usa en frases como:<br>"Déjate de lámparas."'},
+    {t:'El man / La man', e:'🧍',
+      mundo:'El chico / La chica.',
+      ecuador:'Así nos referimos a prácticamente cualquier persona de manera informal.'},
+    {t:'El men', e:'🤙',
+      mundo:'El chico.',
+      ecuador:'Otra forma muy común de hablar de cualquier pana.'},
+    {t:'Arrecho nunca muere, y si muere, muere arrecho', e:'🔥',
+      mundo:'La gente valiente nunca se rinde.',
+      ecuador:'Nuestra forma favorita de recordar que, aunque la situación esté complicada...<br>la actitud nunca se negocia.<br>Es una frase de orgullo, valentía y puro ADN ecuatoriano.'},
+    {t:'Cachar', e:'🧠',
+      mundo:'Entender.',
+      ecuador:'Cuando por fin le cogiste la vuelta a algo.<br>Ya entendiste cómo funciona, ya conectaste los puntos, ya cachaste, ñaño.'},
+    {t:'Del putas', e:'🤯',
+      mundo:'Increíble.',
+      ecuador:'Algo demasiado bueno, impresionante o casi difícil de creer.<br>Si está del putas, ya no necesita más explicación.'},
+    {t:'Agachadito / Hueca', e:'🍛',
+      mundo:'Comida callejera o un lugar pequeño para comer.',
+      ecuador:'Ese lugar escondido donde probablemente vas a comer mejor que en un restaurante elegante.<br>Cumple con las tres B:<br>Bueno.<br>Bonito.<br>Barato.'},
+    {t:'Guambra / Pelado', e:'🧒',
+      mundo:'Niño o joven.',
+      ecuador:'Así les decimos a los chiquitines, aunque dependiendo del contexto también puede ser un adolescente o alguien joven.'},
+    {t:'Hacerse funda', e:'🥴',
+      mundo:'Emborracharse.',
+      ecuador:'No es simplemente tomarse unas copas.<br>Es hacerte pedazos, perder la noción del tiempo y beberte hasta el agua del florero.'}
+  ],
+  comida:[
+    {t:'Bolón', region:'Costa — El Oro',
+      d:'Bola de plátano verde majado, frita y rellena de queso o chicharrón, infaltable en cualquier desayuno costeño.',
+      fact:'Se dice que un buen desayuno costeño no está completo sin un bolón bien tostado y una taza de café pasado.',
+      img:'media/comida/bolon.jpg'},
+    {t:'Encebollado', region:'Costa — Manabí',
+      d:'Guiso de pescado con yuca, cebolla curtida y limón, tan reconfortante como reconstituyente.',
+      fact:'El desayuno no oficial de Ecuador: muchos ecuatorianos bromean que cura absolutamente todo, incluido el desamor y la resaca.',
+      img:'media/comida/encebollado.jpg'},
+    {t:'Hornado', region:'Sierra — Latacunga',
+      d:'Uno de los platos más tradicionales de la Sierra ecuatoriana, preparado con cerdo horneado lentamente y acompañado de mote, tortillas y llapingacho.',
+      fact:'Latacunga es tan famosa por su hornado que dedica una feria completa al plato cada año.',
+      img:'media/comida/hornado.jpg'},
+    {t:'Fritada', region:'Sierra',
+      d:'Trozos de cerdo cocinados lentamente en su propia grasa, servidos con mote, maíz tostado y curtido.',
+      fact:'Tradicionalmente se sirve sobre hojas de achira en lugar de platos, una costumbre que aún se ve en los mercados serranos.',
+      img:'media/comida/fritada.jpg'},
+    {t:'Encocado', region:'Costa — Esmeraldas',
+      d:'Un plato típico de la Costa ecuatoriana elaborado con pescado o mariscos cocinados en una cremosa salsa de coco.',
+      fact:'Su base de coco refleja la herencia afroecuatoriana de Esmeraldas, una de las cocinas más distintivas del país.',
+      img:'media/comida/encocado.jpg'},
+    {t:'Ceviche', region:'Costa — Guayaquil',
+      d:'Mariscos o pescado marinados en limón, cebolla y cilantro, el plato costero más refrescante del país.',
+      fact:'A diferencia de otros países, el ceviche ecuatoriano se sirve con su jugo y suele acompañarse con chifles o canguil.',
+      img:'media/comida/ceviche.jpg'},
+    {t:'Cangrejo', region:'Costa',
+      d:'Cangrejos cocidos y sazonados que se comen con las manos, acompañados de patacones y arroz.',
+      fact:'En temporada de cangrejo, comerlo con las manos —y ensuciarse enteros— se considera parte esencial de la experiencia.',
+      img:'media/comida/cangrejo.jpg'},
+    {t:'Tigrillo', region:'Amazonía — Napo',
+      d:'Plátano verde majado mezclado con huevo revuelto y queso, el desayuno favorito de la Amazonía.',
+      fact:'El nombre viene del aspecto moteado del plátano mezclado con huevo, que recuerda al pelaje de un tigrillo.',
+      img:'media/comida/tigrillo.jpg'},
+    {t:'Guatita', region:'Sierra — Quito',
+      d:'Guiso de mondongo en una salsa espesa de maní, servido con arroz y papas.',
+      fact:'Su salsa de maní amarilla es la razón por la que muchos quiteños la piden como el remedio perfecto contra la resaca.',
+      img:'media/comida/guatita.jpg'},
+    {t:'Llapingachos', region:'Sierra — Ambato',
+      d:'Tortillas de papa rellenas de queso y doradas en la plancha, casi siempre acompañadas de chorizo y aguacate.',
+      fact:'Ambato es conocida como la cuna de los llapingachos, servidos tradicionalmente junto a chorizo, aguacate y ensalada.',
+      img:'media/comida/llapingachos.jpg'},
+    {t:'Corviche', region:'Costa — Esmeraldas',
+      d:'Masa de plátano verde y maní rellena de pescado o camarón, envuelta en hoja y cocida al vapor.',
+      fact:'Es la versión costeña del tamal: se envuelve y se cuece, pero con plátano verde en lugar de maíz.',
+      img:'media/comida/corviche.jpg'},
+    {t:'Pan de Yuca', region:'Costa — Guayaquil',
+      d:'Panecillo suave elaborado con almidón de yuca y queso, tradicionalmente acompañado con yogur.',
+      fact:'En Guayaquil se vende recién horneado en carritos callejeros, y muchos lo acompañan con un yogur frío.',
+      img:'media/comida/pan-de-yuca.jpg'},
+    {t:'Colada Morada', region:'Sierra',
+      d:'Bebida tradicional de frutas y maíz morado que se prepara por el Día de los Difuntos y se acompaña con guaguas de pan.',
+      fact:'Se prepara con mora, mortiño y otras frutas andinas, y tradicionalmente se comparte en los cementerios el 2 de noviembre.',
+      img:'media/comida/colada-morada.jpg'},
+    {t:'Espumilla', region:'Sierra — Ambato',
+      d:'Dulce tradicional preparado con pulpa de fruta y claras batidas, famoso por servirse en las calles y plazas del Ecuador.',
+      fact:'Se bate a mano durante horas hasta lograr su textura esponjosa, por eso Ambato es conocida como su cuna.',
+      img:'media/comida/espumilla.jpg'},
+    {t:'Morocho', region:'Sierra',
+      d:'Bebida caliente y cremosa preparada con maíz morocho, leche, canela y especias.',
+      fact:'Es la bebida navideña por excelencia en la Sierra, servida bien caliente en las noches frías de diciembre.',
+      img:'media/comida/morocho.jpg'}
+  ],
+  /* las burbujas de +593 CORE nacen del archivo viral de arriba */
+  core:CORE593.map(en=>({
+    t:en.displayTitle, e:en.emoji, core593:en,
+    rel:(en.relatedIds||[]).map(id=>C593[id]?.displayTitle).filter(Boolean)
+  })),
+  hacemos:[
+    {t:'Come arroz con absolutamente todo.', e:'🍚',
+      d:'¿Fideos? Con arroz. ¿Menestra? Con arroz. ¿Más arroz? Con arroz. La base de nuestra pirámide alimenticia es otra pirámide de arroz.'},
+    {t:'Regatea hasta lo mínimo.', e:'🤝',
+      d:'No importa si cuesta un dólar: "¿en cuánto me lo deja, veci?" es un reflejo nacional. Se regatea por deporte, no por necesidad.'},
+    {t:'Pide la yapa siempre.', e:'➕',
+      d:'Si no hubo yapa, ¿siquiera fue una compra? La tradición manda.'},
+    {t:'Duerme con el parlante en el oído.', e:'🔊',
+      d:'El vecino pone la música, tú pones el sueño pesado. Así funciona la convivencia.'},
+    {t:'Va por pan y regresa con cola.', e:'🥖',
+      d:'Salió por una funda de pan. Volvió con cola, snacks y algo que estaba en oferta. A veces el pan ni viene.'},
+    {t:'Dice buenos días, buenas tardes, buenas noches y hasta buen provecho.', e:'🚪',
+      d:'Entrar a un lugar sin saludar es moralmente ilegal. Y si alguien está comiendo cerca: buen provecho, siempre.'},
+    {t:'Deja todo para el último momento.', e:'⏳',
+      d:'¿Para qué hacerlo hoy si mañana, con presión, sale mejor? Rendimos bajo presión. La plena.'},
+    {t:'Toma agua de pipa en funda desechable.', e:'🥥',
+      d:'Con sorbete y amarrada con nudo profesional. Tecnología ancestral de hidratación.'},
+    {t:'Come arroz con atún directamente de la lata.', e:'🐟',
+      d:'El plato oficial de fin de mes. No es tristeza: es estrategia.'},
+    {t:'Le dice "veci" a la persona de la tienda.', e:'🏪',
+      d:'No importa que vivas a 40 minutos de la tienda. Es tu veci y punto.'},
+    {t:'Le dice "amiga" a la frutera.', e:'🍉',
+      d:'"Amiga, ¿a cómo la sandía?" — amistad instantánea, descuento probable.'},
+    {t:'Le dice "jefe" al taxista.', e:'🚕',
+      d:'"Jefe, déjeme en la esquina nomás." El ascenso es automático al subirte.'},
+    {t:'Le dice "doctor", "ingeniero" o "licenciado" a cualquiera, aunque no lo sea.', e:'🎓',
+      d:'Aquí los títulos se regalan por respeto. Doctor puede ser cualquiera con camisa planchada.'},
+    {t:'Insiste en que la visita coma algo.', e:'🍽️',
+      d:'"¿Ya comiste? ¿Seguro? ¿Un juguito aunque sea?" Decir que no ofende a tres generaciones.'},
+    {t:'Guarda fundas "por si acaso".', e:'🛍️',
+      d:'La funda llena de fundas debajo del lavadero: patrimonio de toda casa ecuatoriana.'},
+    {t:'Le pone ají a casi todo.', e:'🌶️',
+      d:'Si el ají de la casa es bueno, el restaurante es bueno. Así se mide la calidad en este país.'},
+    {t:'Compra donde la misma casera de siempre.', e:'🧺',
+      d:'Cambiar de casera se siente como traición. Ella ya sabe qué llevas y te guarda lo mejor.'},
+    {t:'Se sube al bus aunque ya parezca lleno.', e:'🚌',
+      d:'"Sigan avanzando, atrás hay espacio." No hay. Pero igual entramos todos.'},
+    {t:'Grita para que el bus pare aunque ya haya arrancado.', e:'🗣️',
+      d:'El bus no para en la parada: para donde llegue el grito.'},
+    {t:'Saca las sillas a la vereda cuando cae la tarde.', e:'🪑',
+      d:'El aire acondicionado ancestral: silla, vereda, chisme y brisa.'}
+  ],
+  madein:[
+    {t:'Julio Jaramillo', e:'🎙️', img:'media/madein/julio-jaramillo.jpg',
+      d:'El Ruiseñor de América, una de las voces más queridas e influyentes de la música latinoamericana.'},
+    {t:'Jefferson Pérez', e:'🚶', img:'media/madein/jefferson-perez.jpg',
+      d:'Primer campeón olímpico del Ecuador y una de las mayores leyendas del deporte nacional.'},
+    {t:'Richard Carapaz', e:'🚴', img:'media/madein/richard-carapaz.jpg',
+      d:'Campeón olímpico y uno de los ciclistas más importantes en la historia del Ecuador.'},
+    {t:'Chito Vera', e:'🥊', img:'media/madein/chito-vera.jpg',
+      d:'El peleador que llevó la bandera ecuatoriana a la élite mundial de la UFC.'},
+    {t:'Moisés Caicedo', e:'⚽', img:'media/madein/moises-caicedo.jpg',
+      d:'Figura del fútbol ecuatoriano y uno de los mediocampistas más destacados de su generación.'},
+    {t:'Alex Ponce', e:'🎤', img:'media/madein/alex-ponce.jpg',
+      d:'Cantautor ecuatoriano que está llevando el pop nacional a nuevas audiencias internacionales.'},
+    {t:'Jombriel', e:'🎵', img:'media/madein/jombriel.jpg',
+      d:'Desde Esmeraldas, uno de los artistas urbanos más destacados de la nueva generación. Con éxitos como "Parte & Choke", ha llevado el talento ecuatoriano a nuevos públicos.'},
+    {t:'Oswaldo Guayasamín', e:'🎨', img:'media/madein/oswaldo-guayasamin.jpg',
+      d:'Pintor y escultor ecuatoriano reconocido mundialmente por retratar la realidad social y las emociones humanas.'},
+    {t:'Matilde Hidalgo', e:'🩺', img:'media/madein/matilde-hidalgo.jpg',
+      d:'Primera mujer en votar en América Latina y pionera de los derechos de la mujer en Ecuador.'},
+    {t:'Eugenio Espejo', e:'✒️', img:'',
+      d:'Médico, escritor y una de las principales figuras intelectuales del proceso independentista ecuatoriano.'},
+    {t:'Sombrero de Paja Toquilla', e:'👒', img:'media/madein/sombrero-paja-toquilla.jpg',
+      d:'Patrimonio Cultural Inmaterial de la Humanidad. Aunque el mundo lo conoce como "Panama Hat", su verdadero origen es ecuatoriano.'},
+    {t:'EnchufeTV', e:'📺', img:'media/madein/enchufetv.jpg',
+      d:'El proyecto de comedia ecuatoriano que conquistó a millones de espectadores en toda Latinoamérica.'}
+  ],
+  facts:[
+    {t:'Somos la mitad del mundo', e:'🌐'},
+    {t:'El Chimborazo es el punto más cercano al sol', e:'☀️'},
+    {t:'Galápagos inspiró a Darwin', e:'🐢'},
+    {t:'Pagamos en dólares', e:'💵'},
+    {t:'País de las orquídeas', e:'🌸'},
+    {t:'La naturaleza tiene derechos', e:'🌿'},
+    {t:'4 mundos en un solo país', e:'🏔️'},
+    {t:'Pides avena, pero no sabe a avena', e:'🥤',
+      d:'La famosa avena polaca es una bebida muy popular en Ecuador, pero su sabor cremoso y frutal no se parece al de la avena tradicional. El nombre te prepara para una cosa y el primer sorbo te entrega otra.'},
+    {t:'En Manabí hay pueblos con nombres que jamás olvidarás', e:'😅',
+      d:'Especialmente en el campo manabita, existen comunidades con nombres inesperados, curiosos y muy difíciles de olvidar — como "El Placer del Culo" y "Pueblo Arrecho". Son nombres reales que forman parte de la geografía y la identidad local.'},
+    {t:'La Virgen del Panecillo es más alta que el Cristo Redentor', e:'🗿',
+      d:'Con su base incluida, la Virgen del Panecillo supera en altura al Cristo Redentor de Río de Janeiro. Además, sus alas la convierten en una de las representaciones de la Virgen más particulares del mundo.'}
+  ],
+  lugares:[
+    {t:'Galápagos', e:'🦎',
+      d:'Un archipiélago único en el mundo donde los animales no te tienen miedo, así de simple. Aquí caminas entre tortugas gigantes, iguanas marinas y lobos marinos como si fueran tus vecinos de toda la vida.',
+      fact:'Inspiraron a Charles Darwin a desarrollar la teoría de la evolución en el siglo XIX.',
+      images:['media/lugares/galapagos.jpg'],
+      media:{map:{lat:-0.74, lng:-90.35, zoom:8, label:'Islas Galápagos'}}},
+    {t:'Quilotoa', e:'🌋',
+      d:'Una laguna turquesa metida dentro del cráter de un volcán, a más de 3.800 metros de altura. Se camina por el borde del cráter y la vista te deja sin aliento, literal y figurativamente.',
+      fact:'Se formó tras una erupción volcánica hace unos 800 años que colapsó la cima de la montaña.',
+      images:['media/lugares/quilotoa.jpg'],
+      media:{map:{lat:-0.859, lng:-78.900, zoom:13, label:'Laguna del Quilotoa'}}},
+    {t:'Baños de Agua Santa', e:'💦',
+      d:'El pueblo de la adrenalina y las aguas termales, metido entre montañas y cascadas. Por la mañana saltas del columpio al fin del mundo, y por la tarde te relajas en una piscina de aguas calientes.',
+      fact:'Vive a la sombra del volcán Tungurahua, activo pero vigilado de cerca por los propios baneños.',
+      images:['media/lugares/banos-de-agua-santa.jpg','media/lugares/banos-de-agua-santa-2.jpg','media/lugares/banos-de-agua-santa-3.jpg'],
+      media:{map:{lat:-1.396, lng:-78.425, zoom:13, label:'Baños de Agua Santa'}}},
+    {t:'Montañita', e:'🏄',
+      d:'Un pueblo costero conocido por sus olas, su vida nocturna y su ambiente relajado, que atrae a viajeros y surfistas de todo el mundo.',
+      fact:'Dato pendiente de confirmar — edita este campo en DATA.lugares.',
+      images:['media/lugares/montanita.jpg'],
+      media:{map:{lat:-1.827, lng:-80.755, zoom:14, label:'Montañita, Santa Elena'}}},
+    {t:'Mitad del Mundo', e:'🌍',
+      d:'El monumento que marca la línea ecuatorial y le da nombre al país. Aquí paras con un pie en cada hemisferio, aunque el GPS diga que la línea real está unos metros más allá.',
+      fact:'Mediciones GPS modernas ubican la línea ecuatorial real unos 240 metros al norte del monumento original.',
+      images:['media/lugares/mitad-del-mundo.jpg'],
+      media:{map:{lat:-0.0022, lng:-78.4558, zoom:15, label:'Ciudad Mitad del Mundo'}}},
+    {t:'Cuenca', e:'⛪',
+      d:'La ciudad colonial de los techos de teja y las cúpulas azules, declarada Patrimonio de la Humanidad. Caminas por El Centro y sientes que el tiempo se puso lento a propósito.',
+      fact:'Su casco histórico fue declarado Patrimonio Cultural de la Humanidad por la UNESCO en 1999.',
+      images:['media/lugares/cuenca.jpg','media/lugares/cuenca-2.jpg'],
+      media:{map:{lat:-2.900, lng:-79.005, zoom:13, label:'Cuenca'}}},
+    {t:'Mindo', e:'🦋',
+      d:'Un pueblo de bosque nublado a un par de horas de Quito, hecho para los que aman los pájaros, las mariposas y el chocolate. Aquí el aire se siente distinto, más verde.',
+      fact:'Es uno de los mejores lugares del mundo para el avistamiento de aves, con cientos de especies registradas en pocos kilómetros cuadrados.',
+      images:['media/lugares/mindo.jpg','media/lugares/mindo-2.jpg','media/lugares/mindo-3.jpg'],
+      media:{map:{lat:-0.054, lng:-78.776, zoom:13, label:'Mindo'}}},
+    {t:'Malecón 2000', e:'🌉',
+      d:'El malecón renovado de Guayaquil, a orillas del río Guayas, con jardines, museos y el histórico Cerro Santa Ana al fondo. Perfecto para caminar de noche con la brisa del río.',
+      fact:'Transformó por completo la cara de Guayaquil desde su remodelación a finales de los años 90 y principios de los 2000.',
+      images:['media/lugares/malecon-2000.jpg','media/lugares/malecon-2000-2.jpg'],
+      media:{map:{lat:-2.194, lng:-79.879, zoom:15, label:'Malecón 2000, Guayaquil'}}},
+    {t:'Cotopaxi', e:'🏔️',
+      d:'Uno de los volcanes activos más altos del mundo, con su cono nevado vigilando la Sierra ecuatoriana. Se visita el Parque Nacional y se sube caminando o en bici hasta el refugio.',
+      fact:'Es uno de los volcanes activos más altos del planeta, con más de 5.800 metros de altura.',
+      images:['media/lugares/cotopaxi.jpg'],
+      media:{map:{lat:-0.6837, lng:-78.4373, zoom:12, label:'Volcán Cotopaxi'}}},
+    {t:'El Panecillo', e:'🗿',
+      d:'La colina en el corazón de Quito coronada por la Virgen alada, visible desde casi cualquier punto de la ciudad. Subir de día regala la mejor vista panorámica del Centro Histórico.',
+      fact:'La estatua de la Virgen de El Panecillo mide unos 30 metros y fue construida con piezas de aluminio ensambladas.',
+      images:['media/lugares/el-panecillo.jpg'],
+      media:{map:{lat:-0.2295, lng:-78.5163, zoom:15, label:'El Panecillo, Quito'}}}
+  ]
+};
+
+const CATMAP={}; CATS.forEach(c=>CATMAP[c.id]=c);
+const BY_TITLE={};
+Object.entries(DATA).forEach(([catId,arr])=>arr.forEach(it=>BY_TITLE[it.t]={...it,catId}));
+function descOf(it){
+  return it.d || `Texto placeholder — aquí va la historia de «${it.t}». Edita este texto en DATA.`;
+}
+function relOf(it){
+  if(it.rel&&it.rel.length)return it.rel;
+  /* 3-4 expresiones relacionadas de la misma categoría, en orden variable */
+  const pool=DATA[it.catId].filter(x=>x.t!==it.t).map(x=>x.t);
+  for(let i=pool.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[pool[i],pool[j]]=[pool[j],pool[i]];}
+  return pool.slice(0,Math.min(4,pool.length));
+}
+
+/* ================== MUNDO 3D ================== */
+let renderer,scene,camera,earthGroup,earth,clouds,atmo,anchor,stars;
+const EC_LAT=-1.7, EC_LON=-78.6;
+const CAM_START=3.4, CAM_END=1.048;
+
+function latLonToVec(lat,lon,r=1){
+  const phi=(90-lat)*Math.PI/180, theta=(lon+180)*Math.PI/180;
+  return new THREE.Vector3(
+    -r*Math.sin(phi)*Math.cos(theta),
+     r*Math.cos(phi),
+     r*Math.sin(phi)*Math.sin(theta)
+  );
+}
+
+function initSpace(){
+  try{ initSpaceInner(); }
+  catch(e){ console.error('EcuadorCore 3D:',e); webgl=false; fallbackSpace(); }
+}
+function initSpaceInner(){
+  if(typeof THREE==='undefined')throw new Error('THREE no cargó (¿sin internet?)');
+  renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false});
+  renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
+  renderer.setSize(W(),H());
+  scene=new THREE.Scene();
+  scene.background=new THREE.Color(0x000208);
+  camera=new THREE.PerspectiveCamera(38,W()/H(),0.005,200);
+  camera.position.set(0,0.22,CAM_START);
+
+  const sg=new THREE.BufferGeometry(), n=1400, pos=new Float32Array(n*3);
+  for(let i=0;i<n;i++){
+    /* punto aleatorio en esfera (compatible con three r128) */
+    let x,y,z,l;
+    do{x=Math.random()*2-1;y=Math.random()*2-1;z=Math.random()*2-1;l=x*x+y*y+z*z;}while(l>1||l===0);
+    const R=(40+Math.random()*50)/Math.sqrt(l);
+    pos[i*3]=x*R; pos[i*3+1]=y*R; pos[i*3+2]=z*R;
+  }
+  sg.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  stars=new THREE.Points(sg,new THREE.PointsMaterial({color:0xbfd0ff,size:.35,sizeAttenuation:true,transparent:true,opacity:.85}));
+  scene.add(stars);
+
+  const sun=new THREE.DirectionalLight(0xfff2dd,1.6); sun.position.set(-4,1.4,2.4); scene.add(sun);
+  scene.add(new THREE.AmbientLight(0x24365e,.6));
+
+  earthGroup=new THREE.Group(); scene.add(earthGroup);
+  const loader=new THREE.TextureLoader(); loader.crossOrigin='anonymous';
+  const earthMat=new THREE.MeshPhongMaterial({color:0x1a2c4e,specular:new THREE.Color(0x1c2f45),shininess:12});
+  earth=new THREE.Mesh(new THREE.SphereGeometry(1,96,96),earthMat);
+  earthGroup.add(earth);
+
+  const EARTH_URLS=[
+    'https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg',
+    'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/planets/earth_atmos_2048.jpg'
+  ];
+  (function tryEarth(i){
+    if(i>=EARTH_URLS.length){goBtn.disabled=false;return;}
+    loader.load(EARTH_URLS[i],tex=>{
+      earthMat.map=tex; earthMat.color=new THREE.Color(0xffffff); earthMat.needsUpdate=true;
+      goBtn.disabled=false;
+    },undefined,()=>tryEarth(i+1));
+  })(0);
+
+  const cloudMat=new THREE.MeshLambertMaterial({transparent:true,opacity:0,depthWrite:false});
+  clouds=new THREE.Mesh(new THREE.SphereGeometry(1.013,64,64),cloudMat);
+  earthGroup.add(clouds);
+  loader.load('https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/planets/earth_clouds_1024.png',
+    tex=>{cloudMat.map=tex;cloudMat.needsUpdate=true;cloudMat.opacity=.85;});
+
+  atmo=new THREE.Mesh(
+    new THREE.SphereGeometry(1.16,64,64),
+    new THREE.ShaderMaterial({
+      vertexShader:`varying vec3 vN;void main(){vN=normalize(normalMatrix*normal);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
+      fragmentShader:`varying vec3 vN;void main(){float i=pow(0.66-dot(vN,vec3(0.,0.,1.)),2.2);gl_FragColor=vec4(0.30,0.58,1.0,1.0)*i*1.35;}`,
+      side:THREE.BackSide,blending:THREE.AdditiveBlending,transparent:true,depthWrite:false
+    })
+  );
+  scene.add(atmo);
+
+  anchor=new THREE.Object3D();
+  anchor.position.copy(latLonToVec(EC_LAT,EC_LON));
+  earth.add(anchor);
+
+  dirFrom=new THREE.Vector3(); _v=new THREE.Vector3(); _look=new THREE.Vector3();
+  earthGroup.rotation.y=-1.1;
+
+  window.addEventListener('resize',onResize);
+  setTimeout(()=>{goBtn.disabled=false;},5000);
+  requestAnimationFrame(tick);
+}
+function onResize(){
+  if(webgl){
+    renderer.setSize(W(),H());
+    camera.aspect=W()/H(); camera.updateProjectionMatrix();
+  }
+  if(engine){
+    buildWalls();
+    if(phase==='universe'){
+      computeOrbit();
+      sil.style.width=ORBIT.silW+'px';
+      sil.style.left=W()/2+'px'; sil.style.top=H()/2+'px';
+    }
+    bubbles.forEach(o=>{
+      const b=o.body;
+      Matter.Body.setPosition(b,{x:clamp(b.position.x,o.r,W()-o.r),y:clamp(b.position.y,o.r,H()-o.r)});
+    });
+  }
+}
+function fallbackSpace(){
+  document.body.style.background='radial-gradient(circle at 50% 40%, #16305e 0%, #0a1a3a 45%, #000208 100%)';
+  canvas.style.display='none';
+  goBtn.disabled=false;
+}
+
+/* ================== LOOP DE CÁMARA ================== */
+let zoomT0=0, rotFrom=0, rotDiff=0, dirFrom=null, _v=null, _look=null;
+const ZOOM_MS=7000;
+function anchorWorld(out){ return anchor.getWorldPosition(out); }
+
+function tick(now){
+  requestAnimationFrame(tick);
+  if(!webgl)return;
+
+  if(phase==='space'){
+    earthGroup.rotation.y+=0.00055;
+    clouds.rotation.y+=0.00022;
+    camera.position.x=0.14*Math.sin(now*0.00009);
+    camera.position.y=0.22+0.05*Math.sin(now*0.00013);
+    camera.lookAt(0,0,0);
+  }
+  else if(phase==='zoom'){
+    const t=clamp((now-zoomT0)/ZOOM_MS,0,1);
+    const e=easeZoom(t);
+    earthGroup.rotation.y=rotFrom+rotDiff*smooth(clamp(t/0.7,0,1));
+    clouds.rotation.y+=0.00022;
+    const d=1+(CAM_START-1)*Math.exp(Math.log((CAM_END-1)/(CAM_START-1))*e);
+    anchorWorld(_v).normalize();
+    const k=smooth(clamp(t/0.62,0,1));
+    const dir=dirFrom.clone().lerp(_v,k).normalize();
+    camera.position.copy(dir).multiplyScalar(d);
+    anchorWorld(_look).multiplyScalar(k);
+    camera.lookAt(_look);
+    camera.fov=38-6*e; camera.updateProjectionMatrix();
+    if(clouds.material.map)clouds.material.opacity=.85*clamp((d-1.3)/.8,0,1);
+    atmo.visible=d>1.35;
+    updateSilhouette(t,d);
+    if(t>=1)arrive();
+  }
+  else{
+    earthGroup.rotation.y+=0.00003;
+  }
+  renderer.render(scene,camera);
+}
+
+function updateSilhouette(t,d){
+  if(t<0.55)return;
+  anchorWorld(_v).project(camera);
+  const x=(_v.x*0.5+0.5)*W(), y=(-_v.y*0.5+0.5)*H();
+  const minDim=Math.min(W(),H());
+  const grow=0.55+0.45*smooth(clamp((t-0.7)/0.3,0,1));
+  const size=clamp(minDim*0.05/(d-1), 30, minDim*0.62)*grow;
+  sil.style.left=x+'px'; sil.style.top=y+'px';
+  sil.style.width=size+'px';
+  sil.style.opacity=clamp((t-0.72)/0.22,0,1);
+}
+
+/* ================== EL CLICK ================== */
+goBtn.addEventListener('click',()=>{
+  if(phase!=='space')return;
+  titleUI.classList.add('hide');
+  if(!webgl){arrive();return;}
+  phase='zoom';
+  zoomT0=performance.now();
+  rotFrom=earthGroup.rotation.y;
+  const p=anchor.position;
+  const target=-Math.atan2(p.x,p.z);
+  rotDiff=target-rotFrom;
+  rotDiff=((rotDiff+Math.PI)%(Math.PI*2)+Math.PI*2)%(Math.PI*2)-Math.PI;
+  dirFrom.copy(camera.position).normalize();
+  navigator.vibrate&&navigator.vibrate(20);
+});
+
+/* ================== LLEGADA ================== */
+function arrive(){
+  if(phase==='hold'||phase==='phrase'||phase==='bubbles')return;
+  phase='hold';
+  const minDim=Math.min(W(),H());
+  sil.classList.add('hero');
+  sil.style.transition='left 1.2s ease, top 1.2s ease, width 1.2s ease';
+  sil.style.left=W()/2+'px'; sil.style.top=H()/2+'px';
+  sil.style.width=Math.min(minDim*0.62, 520)+'px';
+  sil.style.opacity=1;
+  canvas.classList.add('dof');
+  warm.classList.add('on');
+  setTimeout(showPhrase,1100);
+}
+
+function showPhrase(){
+  phase='phrase';
+  phrase.classList.add('show');
+  const delays={l1:0,l2:650,l3:1500,l4:2150,l5:2900};
+  Object.entries(delays).forEach(([id,ms])=>setTimeout(()=>$(id).classList.add('animIn'),ms));
+  /* la frase completa vive ~2.5s y se disuelve (o toca para adelantar) */
+  setTimeout(dissolvePhrase,6600);
+  document.addEventListener('pointerdown',dissolvePhrase,{once:true});
+}
+
+/* ============================================================
+   FÍSICA — Matter.js
+   ============================================================ */
+const { Engine, Runner, Bodies, Body, Composite, Events } = Matter;
+let engine=null; const bubbles=new Map(); let walls=[];
+
+function buildWalls(){
+  walls.forEach(w=>Composite.remove(engine.world,w));
+  const t=200;
+  walls=[
+    Bodies.rectangle(W()/2,-t/2,W()+t*2,t,{isStatic:true}),
+    Bodies.rectangle(W()/2,H()+t/2,W()+t*2,t,{isStatic:true}),
+    Bodies.rectangle(-t/2,H()/2,t,H()+t*2,{isStatic:true}),
+    Bodies.rectangle(W()+t/2,H()/2,t,H()+t*2,{isStatic:true})
+  ];
+  Composite.add(engine.world,walls);
+}
+function initPhysics(){
+  engine=Engine.create();
+  engine.gravity.x=0; engine.gravity.y=0;
+  Runner.run(Runner.create(),engine);
+  buildWalls();
+  /* control orbital: las categorías viajan alrededor de la silueta */
+  Events.on(engine,'beforeUpdate',()=>{
+    if(phase!=='universe')return;
+    const now=performance.now();
+    bubbles.forEach(o=>{
+      if(o.kind!=='category')return;
+      if(o.dragging||now<(o.freeUntil||0))return;   /* respeta arrastres y lanzamientos */
+      if(!o.paused)o.ang+=ORBIT.speed*(o.speedF||1);
+      const t=orbitTarget(o,now);
+      Body.setVelocity(o.body,{x:(t.x-o.body.position.x)*0.06,y:(t.y-o.body.position.y)*0.06});
+    });
+  });
+  Events.on(engine,'afterUpdate',()=>{
+    bubbles.forEach(o=>{
+      const {x,y}=o.body.position;
+      if(o.targetScale!==undefined)o.vis+=(o.targetScale-o.vis)*0.1;
+      o.el.style.transform=`translate(${x-o.r}px, ${y-o.r}px) scale(${o.vis!==undefined?o.vis.toFixed(3):1})`;
+    });
+  });
+}
+
+function makeBubble({x,y,r,kind,cat=null,data=null,grad=null,ink=false,html,vx=0,vy=0,anim='pop'}){
+  x=clamp(x,r+4,W()-r-4); y=clamp(y,r+4,H()-r-4);
+  const body=Bodies.circle(x,y,r,{restitution:.92,frictionAir:.012,friction:.001,density:.0016});
+  Body.setInertia(body,Infinity);
+  Body.setVelocity(body,{x:vx,y:vy});
+  Composite.add(engine.world,body);
+
+  const el=document.createElement('div');
+  el.className='bubble '+anim+(ink?' inkText':'');
+  el.style.width=el.style.height=r*2+'px';
+  const c=grad||(cat?cat.colors:['#8338ec','#b57bff']);
+  el.style.background=`radial-gradient(circle at 32% 28%, #ffffffbb, ${c[1]} 42%, ${c[0]} 100%)`;
+  el.style.fontSize=Math.max(11,r/5)+'px';
+  el.innerHTML=html;
+  worldEl.appendChild(el);
+  setTimeout(()=>el.classList.remove(anim),750);
+
+  const obj={body,el,kind,cat,data,r,vis:0.25,targetScale:1.1,inWorld:true};
+  bubbles.set(body.id,obj);
+  setTimeout(()=>{obj.targetScale=1;},380);   /* pequeño rebote de nacimiento */
+  attachPointer(obj);
+  return obj;
+}
+
+function burstRemove(obj){
+  obj.targetScale=1.6;
+  obj.el.style.transition='opacity .3s ease';
+  obj.el.style.opacity='0';
+  setTimeout(()=>{obj.el.remove();Composite.remove(engine.world,obj.body);bubbles.delete(obj.body.id);},320);
+}
+
+function attachPointer(obj){
+  const el=obj.el; let dragging=false,moved=false,sx,sy,last,lastT;
+  const pt=e=>({x:e.clientX,y:e.clientY});
+  el.addEventListener('pointerdown',e=>{
+    e.preventDefault(); dragging=true; moved=false; obj.dragging=true;
+    const p=pt(e); sx=p.x; sy=p.y; last=p; lastT=performance.now();
+    obj.body.frictionAir=.2; el.style.zIndex=10;
+    el.setPointerCapture&&el.setPointerCapture(e.pointerId);
+  });
+  el.addEventListener('pointermove',e=>{
+    if(!dragging)return;
+    const p=pt(e);
+    if(Math.hypot(p.x-sx,p.y-sy)>6)moved=true;
+    Body.setPosition(obj.body,{x:p.x,y:p.y});
+    Body.setVelocity(obj.body,{x:0,y:0});
+    last=p; lastT=performance.now();
+  });
+  const up=e=>{
+    if(!dragging)return;
+    dragging=false; obj.dragging=false; obj.body.frictionAir=.012; el.style.zIndex='';
+    const p=pt(e), dt=Math.max(16,performance.now()-lastT);
+    Body.setVelocity(obj.body,{x:(p.x-last.x)/dt*16,y:(p.y-last.y)/dt*16});
+    if(moved)obj.freeUntil=performance.now()+1200;  /* rebota libre y luego vuelve a su órbita */
+    if(!moved)onClick(obj);
+  };
+  el.addEventListener('pointerup',up);
+  el.addEventListener('pointercancel',up);
+  /* hover: la burbuja se ralentiza para leerse mejor */
+  el.addEventListener('pointerenter',()=>{obj.speedF=0.25;});
+  el.addEventListener('pointerleave',()=>{obj.speedF=1;});
+}
+
+function onClick(obj){
+  if(obj.kind==='category')      enterRoom(obj);   /* la burbuja es la puerta de su sala */
+  else if(obj.kind==='content')  openModal(obj.data.t);
+}
+
+/* ============================================================
+   EL MUSEO — entrar y salir de las salas
+   El velo circular nace en la burbuja, con sus colores,
+   y se traga la pantalla: nunca se siente un cambio de página.
+   ============================================================ */
+const roomEl=$('room'), roomVeil=$('roomVeil'), roomBody=$('roomBody'), roomHead=$('roomHead');
+/* FUENTE ÚNICA DE VERDAD para la navegación:
+   phase: 'universe' (LOBBY) | 'room' (SALA) — la carta vive en overlay sobre la sala.
+   activeRoom/roomBubble: sala activa y su burbuja-puerta.
+   La UI se renderiza según este estado, nunca al revés. */
+let activeRoom=null, roomBubble=null;
+
+/* mostrar/ocultar las 7 puertas del lobby: visual Y físicamente
+   (sus cuerpos salen del mundo para no chocar con las piezas de la sala) */
+function setLobbyDoorsVisible(v){
+  bubbles.forEach(o=>{
+    if(o.kind!=='category')return;
+    o.el.style.visibility=v?'':'hidden';
+    if(v&&!o.inWorld){Composite.add(engine.world,o.body);Body.setVelocity(o.body,{x:0,y:0});o.inWorld=true;}
+    else if(!v&&o.inWorld){Composite.remove(engine.world,o.body);o.inWorld=false;}
+  });
+}
+/* limpieza instantánea de piezas de sala (evita duplicados al reentrar rápido) */
+function clearRoomPieces(){
+  bubbles.forEach(o=>{
+    if(o.kind!=='content')return;
+    o.el.remove();Composite.remove(engine.world,o.body);bubbles.delete(o.body.id);
+  });
+}
+
+function enterRoom(obj){
+  if(phase!=='universe')return;
+  phase='room';
+  activeRoom=obj.cat; roomBubble=obj;
+  obj.paused=true; obj.targetScale=1.18;
+  navigator.vibrate&&navigator.vibrate(20);
+  topbar.classList.remove('show');
+  hintEl.classList.remove('show');
+
+  const {x,y}=obj.body.position;
+  const c=obj.cat.colors;
+  roomVeil.style.transition='none';
+  roomVeil.style.left=x+'px'; roomVeil.style.top=y+'px';
+  roomVeil.style.background=`radial-gradient(circle at 40% 35%, ${c[1]}, ${c[0]})`;
+  roomVeil.style.transform='translate(-50%,-50%) scale(0)';
+  roomVeil.style.opacity='1';
+  void roomVeil.offsetWidth;
+  const S=Math.hypot(Math.max(x,W()-x),Math.max(y,H()-y))*2/120+0.2;
+  roomVeil.style.transition='transform .8s cubic-bezier(.6,.05,.3,1), opacity .5s ease';
+  roomVeil.style.transform=`translate(-50%,-50%) scale(${S})`;
+
+  setTimeout(()=>{
+    if(phase!=='room')return;              /* por si salió antes de tiempo */
+    setLobbyDoorsVisible(false);           /* SOLO las piezas de esta sala serán visibles */
+    clearRoomPieces();
+    roomEl.className='open theme-'+obj.cat.id;
+    roomEl.setAttribute('aria-hidden','false');
+    roomHead.className='show theme-'+obj.cat.id;
+    buildRoom(obj.cat);
+    roomVeil.style.opacity='0';
+  },620);
+}
+
+function buildRoom(room){
+  $('roomEmoji').textContent=room.emoji;
+  $('roomName').textContent=room.label.replace(/<br>/g,' ');
+  $('roomTag').textContent=room.tag||'';
+  roomBody.innerHTML='';
+  const items=DATA[room.id]||[];
+  if(room.layout==='float'){
+    /* sala-patio: las piezas flotan con la física de siempre */
+    worldEl.classList.add('inRoom');
+    items.forEach((it,i)=>{
+      const ang=Math.random()*Math.PI*2;
+      setTimeout(()=>spawnChild(it,room,W()/2,H()/2,Math.cos(ang)*8,Math.sin(ang)*8),250+i*70);
+    });
+    setTimeout(()=>showHint('Arrástralas, chócalas, tócalas 👆'),1000);
+  }else if(room.layout==='stickers'){
+    /* checklist juguetón: notas adhesivas que flotan suavecito */
+    roomBody.innerHTML=`<div class="stickers">${items.map((it,i)=>{
+      const rot=(((i*7)%5)-2)*1.6;
+      return `<button class="sticker" data-t="${it.t.replace(/"/g,'&quot;')}"
+        style="--rot:${rot}deg;animation-delay:${(.05+i*0.05).toFixed(2)}s,${(i%4*0.9).toFixed(1)}s">
+        <span class="check">✓</span>
+        <span class="sBody"><span class="sEmoji">${it.e||'✨'}</span><span class="sName">${it.t}</span></span>
+      </button>`;}).join('')}</div>`;
+    roomBody.querySelectorAll('.sticker').forEach(st=>st.onclick=()=>openModal(st.dataset.t));
+  }else if(room.id==='lugares'){
+    /* sala de lugares: destino visual — cada pieza es su foto real, no una burbuja de texto */
+    roomBody.innerHTML=`<div class="place-grid">${items.map((it,i)=>{
+      const img=(it.images&&it.images[0])||'';
+      return `<button class="place-card" data-t="${it.t.replace(/"/g,'&quot;')}" style="animation-delay:${(.05+i*0.055).toFixed(2)}s">
+        ${img?`<img src="${img}" alt="${it.t}" loading="lazy">`:`<div class="pc-fallback">${it.e||'📍'}</div>`}
+        <div class="pc-veil"></div>
+        <div class="pc-name">${it.e||'📍'} ${it.t}</div>
+      </button>`;
+    }).join('')}</div>`;
+    roomBody.querySelectorAll('.place-card').forEach(card=>{
+      card.onclick=()=>openModal(card.dataset.t);
+      const img=card.querySelector('img');
+      if(img)img.onerror=()=>{                 /* nunca dejar el ícono roto: placeholder intencional */
+        const ph=document.createElement('div');
+        ph.className='pc-fallback'; ph.textContent='📍';
+        img.replaceWith(ph);
+      };
+    });
+  }else if(room.id==='comida'){
+    /* sala de gastronomía: galería premium tipo Pinterest/Airbnb con las fotos reales de cada plato */
+    roomBody.innerHTML=`<div class="gastro-grid">${items.map((it,i)=>{
+      const img=it.img||'';
+      return `<button class="gastro-card" data-t="${it.t.replace(/"/g,'&quot;')}" style="animation-delay:${(.04+i*0.045).toFixed(2)}s">
+        <div class="gc-frame">
+          ${img?`<img src="${img}" alt="${it.t}" loading="lazy">`:`<div class="gc-fallback">Fotografía pendiente</div>`}
+        </div>
+        <div class="gc-name">${it.t}</div>
+      </button>`;
+    }).join('')}</div>`;
+    roomBody.querySelectorAll('.gastro-card').forEach(card=>{
+      card.onclick=()=>openModal(card.dataset.t);
+      const img=card.querySelector('img');
+      if(img)img.onerror=()=>{                 /* nunca dejar el ícono roto: reemplazo limpio, sin emojis */
+        const ph=document.createElement('div');
+        ph.className='gc-fallback'; ph.textContent='Fotografía pendiente';
+        img.replaceWith(ph);
+      };
+    });
+  }else{
+    /* salón de piezas: cada item es una obra en la pared.
+       MADE IN ECU usa una variante con foto real (mismo marco .tile, solo cambia el contenido). */
+    const isMadein=room.id==='madein';
+    roomBody.innerHTML=`<div class="tiles">${items.map((it,i)=>{
+      if(isMadein){
+        const img=it.img||'';
+        return `<button class="tile hasphoto" data-t="${it.t.replace(/"/g,'&quot;')}" style="animation-delay:${(.05+i*0.055).toFixed(2)}s">
+          ${img?`<img class="tPhoto" src="${img}" alt="${it.t}" loading="lazy">`:`<div class="tPhoto-fallback">${it.e||'✨'}</div>`}
+          <span class="tName">${it.t}</span>
+        </button>`;
+      }
+      return `<button class="tile" data-t="${it.t.replace(/"/g,'&quot;')}" style="animation-delay:${(.05+i*0.055).toFixed(2)}s">
+         <span class="tEmoji">${it.e||'✨'}</span><span class="tName">${it.t}</span>
+       </button>`;
+    }).join('')}</div>`;
+    roomBody.querySelectorAll('.tile').forEach(tl=>{
+      tl.onclick=()=>openModal(tl.dataset.t);
+      if(isMadein){
+        const img=tl.querySelector('img.tPhoto');
+        if(img)img.onerror=()=>{                /* nunca dejar el ícono roto: placeholder intencional */
+          const ph=document.createElement('div');
+          ph.className='tPhoto-fallback'; ph.textContent='✨';
+          img.replaceWith(ph);
+        };
+      }
+    });
+  }
+}
+
+$('backLobby').onclick=exitRoom;
+function exitRoom(){
+  if(phase!=='room')return;
+  closeModal();                            /* 1. cerrar cualquier carta abierta */
+  clearRoomPieces();                       /* 2. retirar TODAS las piezas de la sala */
+  worldEl.classList.remove('inRoom');
+  /* 3-4. el velo cubre, la sala se apaga detrás, y se contrae hacia su burbuja */
+  const {x,y}=roomBubble.body.position;
+  roomVeil.style.transition='none';
+  roomVeil.style.left=x+'px'; roomVeil.style.top=y+'px';
+  const S=Math.hypot(Math.max(x,W()-x),Math.max(y,H()-y))*2/120+0.2;
+  roomVeil.style.transform=`translate(-50%,-50%) scale(${S})`;
+  roomVeil.style.opacity='1';
+  roomEl.className=''; roomEl.setAttribute('aria-hidden','true'); roomBody.innerHTML='';
+  roomHead.className='';
+  void roomVeil.offsetWidth;
+  roomVeil.style.transition='transform .7s cubic-bezier(.6,.05,.3,1), opacity .4s ease .3s';
+  roomVeil.style.transform='translate(-50%,-50%) scale(0)';
+  roomVeil.style.opacity='0';
+  /* 5-8. restaurar el lobby EXACTO: puertas visibles, órbita viva, controles activos */
+  setLobbyDoorsVisible(true);
+  roomBubble.paused=false; roomBubble.targetScale=1;
+  activeRoom=null; roomBubble=null;
+  phase='universe';
+  topbar.classList.add('show');
+  showHint('Cada burbuja es una sala del museo 🏛️');
+}
+
+/* ================== DISOLUCIÓN DE LA FRASE ================== */
+let dissolved=false;
+function dissolvePhrase(){
+  if(dissolved||phase!=='phrase')return;
+  dissolved=true;
+  navigator.vibrate&&navigator.vibrate(20);
+  phrase.classList.add('dissolve');
+  setTimeout(()=>{phrase.style.display='none';enterUniverse();},1150);
+}
+
+/* ================== ÓRBITA ALREDEDOR DE LA SILUETA ==================
+   Ecuador quieto al centro; las categorías recorren su contorno
+   por una elipse suavemente irregular (nunca un círculo perfecto). */
+const ORBIT={cx:0,cy:0,rx:0,ry:0,r:60,silW:300,speed:0.0011};
+function computeOrbit(){
+  const minDim=Math.min(W(),H());
+  ORBIT.r=clamp(minDim/8.6,46,74);
+  const rxMax=W()/2-ORBIT.r-14, ryMax=H()/2-ORBIT.r-86;
+  let silW=Math.min(minDim*0.46, 420, 2*(rxMax-ORBIT.r-18), 2*(ryMax-ORBIT.r-18)/1.1);
+  ORBIT.silW=Math.max(silW,150);
+  ORBIT.cx=W()/2; ORBIT.cy=H()/2;
+  /* /1.13: deja espacio para la modulación orgánica sin tocar los bordes */
+  ORBIT.rx=Math.min(ORBIT.silW*0.52+ORBIT.r+30, rxMax/1.13);
+  ORBIT.ry=Math.min(ORBIT.silW*0.58+ORBIT.r+30, ryMax/1.13);
+}
+/* Zona reservada para Galápagos: ningún bubble de categoría debe entrar ahí.
+   No cambia los ángulos asignados a cada categoría ni su física/arrastre —
+   solo acerca ligeramente el RADIO objetivo de la órbita cuando el ángulo actual
+   de CUALQUIER burbuja pasa por ese sector fijo de la pantalla (abajo-izquierda,
+   entre +593 CORE y LUGARES), dejando ese espacio libre para las islas. */
+const GAL_WEDGE_CENTER=2.5227, GAL_WEDGE_HALF=0.7330, GAL_WEDGE_PULL=0.75;
+function galapagosOrbitAtten(a){
+  const d=Math.abs((((a-GAL_WEDGE_CENTER+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI))-Math.PI);
+  if(d>GAL_WEDGE_HALF)return 1;
+  const t=d/GAL_WEDGE_HALF;
+  return 1-GAL_WEDGE_PULL*0.5*(1+Math.cos(Math.PI*t));
+}
+function orbitTarget(o,now){
+  const a=o.ang;
+  /* radio modulado: la órbita sigue el contorno de forma orgánica y respira */
+  const mod=1+0.07*Math.sin(a*2+o.ph1)+0.04*Math.sin(a*3+o.ph2)+0.015*Math.sin(now*0.001+o.ph1);
+  const gal=galapagosOrbitAtten(a);
+  return {x:ORBIT.cx+Math.cos(a)*ORBIT.rx*mod*gal, y:ORBIT.cy+Math.sin(a)*ORBIT.ry*mod*gal};
+}
+
+/* ================== ENTRADA AL UNIVERSO ================== */
+function enterUniverse(){
+  phase='universe';
+  initPhysics();
+  worldEl.classList.add('on');
+  computeOrbit();
+  /* la silueta permanece: ancla visual del universo */
+  sil.style.width=ORBIT.silW+'px';
+  CATS.forEach((cat,i)=>{
+    setTimeout(()=>{
+      const ang=-Math.PI/2 + (Math.PI*2/CATS.length)*i;
+      const o=makeBubble({
+        x:ORBIT.cx+Math.cos(ang)*ORBIT.rx, y:ORBIT.cy+Math.sin(ang)*ORBIT.ry,
+        r:ORBIT.r, cat, kind:'category',
+        html:`<div><span class="emoji">${cat.emoji}</span><span>${cat.label}</span></div>`
+      });
+      o.ang=ang; o.speedF=1; o.paused=false;
+      o.ph1=Math.random()*Math.PI*2; o.ph2=Math.random()*Math.PI*2;
+    }, i*300);
+  });
+  setTimeout(()=>{
+    topbar.classList.add('show');
+    showHint('Explora Ecuador: cada burbuja es una sala del museo 🏛️🇪🇨');
+  }, ROOMS.length*300+400);
+}
+
+/* ================== PIEZAS FLOTANTES (salas-patio) ================== */
+function spawnChild(it,cat,x,y,vx,vy){
+  const r=Math.min(62,Math.max(40,W()/16));
+  makeBubble({
+    x,y,r,cat,kind:'content',data:it,
+    html:`<div><span class="emoji">${it.e||'✨'}</span><span>${it.t}</span></div>`,
+    vx,vy
+  });
+}
+
+/* ============================================================
+   MÓDULO MULTIMEDIA — cada tipo es un renderer independiente.
+   Llena media:{...} en el item para reemplazar los placeholders.
+   Para un TIPO nuevo: añade entrada en MEDIA_TYPES + RENDER.
+   ============================================================ */
+const MEDIA_TYPES=[
+  {id:'gallery',   icon:'📷', name:'Galería'},
+  {id:'video',     icon:'🎬', name:'Video'},
+  {id:'pinterest', icon:'📌', name:'Pinterest'},
+  {id:'tiktok',    icon:'🎵', name:'TikTok'},
+  {id:'instagram', icon:'📸', name:'Instagram'},
+  {id:'audio',     icon:'🎧', name:'Audio'},
+  {id:'map',       icon:'🗺️', name:'Mapa'}
+];
+function mph(icon,txt){return `<div class="mph"><span class="cam">${icon}</span><span>${txt}</span></div>`;}
+
+const RENDER={
+  gallery(it){
+    const g=it.media?.gallery;
+    if(!g||!g.length)return `<div class="gal"><div class="ph">📷</div><div class="ph">📷</div><div class="ph">📷</div></div>
+      <div class="mcap">Galería próximamente — agrega fotos en <code>media.gallery</code></div>`;
+    return `<div class="gal">${g.map(im=>`<img src="${im.src}" alt="${im.cap||it.t}" loading="lazy">`).join('')}</div>`
+      +(g[0].cap?`<div class="mcap">${g[0].cap}</div>`:'');
+  },
+  video(it){
+    const v=it.media?.video;
+    if(!v)return mph('🎬','Video próximamente — media.video');
+    if(v.youtube)return `<iframe class="mframe" style="aspect-ratio:16/9" loading="lazy"
+      src="https://www.youtube-nocookie.com/embed/${v.youtube}"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+    return `<video class="mframe" style="aspect-ratio:16/9" controls preload="metadata" src="${v.src}"></video>`;
+  },
+  pinterest(it){
+    const p=it.media?.pinterest;
+    if(!p||!p.length)return mph('📌','Pins de Pinterest próximamente — media.pinterest');
+    loadPinterestSDK();
+    return p.map(u=>`<a data-pin-do="embedPin" data-pin-width="medium" href="${u}"></a>`).join('')
+      +`<div class="mcap"><a href="${p[0]}" target="_blank" rel="noopener">Ver en Pinterest ↗</a></div>`;
+  },
+  tiktok(it){
+    const u=it.media?.tiktok;
+    if(!u)return mph('🎵','TikTok próximamente — media.tiktok');
+    const m=u.match(/video\/(\d+)/);
+    if(m)return `<iframe class="mframe" style="height:500px" loading="lazy"
+      src="https://www.tiktok.com/embed/v2/${m[1]}" allow="encrypted-media; fullscreen"></iframe>`;
+    return mph('🎵','URL de TikTok no reconocida')+`<div class="mcap"><a href="${u}" target="_blank" rel="noopener">Ver en TikTok ↗</a></div>`;
+  },
+  instagram(it){
+    const u=it.media?.instagram;
+    if(!u)return mph('📸','Instagram próximamente — media.instagram');
+    const m=u.match(/instagram\.com\/(p|reel)\/([^/?#]+)/);
+    if(m)return `<iframe class="mframe" style="height:470px" loading="lazy"
+      src="https://www.instagram.com/${m[1]}/${m[2]}/embed" allow="encrypted-media"></iframe>`;
+    return mph('📸','URL de Instagram no reconocida')+`<div class="mcap"><a href="${u}" target="_blank" rel="noopener">Ver en Instagram ↗</a></div>`;
+  },
+  audio(it){
+    const a=it.media?.audio;
+    if(!a)return mph('🎧','Audio próximamente — media.audio');
+    return (a.title?`<div class="mcap">🎧 ${a.title}</div>`:'')+`<audio controls preload="metadata" src="${a.src}"></audio>`;
+  },
+  map(it){
+    const mp=it.media?.map||{lat:-1.83, lng:-78.18, zoom:6, label:'Ecuador 🇪🇨'};
+    return `<iframe class="mframe" style="height:240px" loading="lazy"
+      src="https://maps.google.com/maps?q=${mp.lat},${mp.lng}&z=${mp.zoom||12}&hl=es&output=embed"></iframe>
+      <div class="mcap">📍 ${mp.label||it.t}</div>`;
+  }
+};
+
+let pinSDK=false;
+function loadPinterestSDK(){
+  if(pinSDK)return; pinSDK=true;
+  const s=document.createElement('script');
+  s.src='https://assets.pinterest.com/js/pinit.js'; s.async=true; s.defer=true;
+  document.body.appendChild(s);
+}
+
+/* ---------- carta +593 CORE (momentos virales) ---------- */
+/* la media se adapta sola: pending → placeholder pulido;
+   uploaded/published → video, imagen o galería según lo que llenes */
+function core593Media(en){
+  if(en.mediaStatus==='pending'||(!en.videoUrl&&!en.imageUrl&&!(en.gallery&&en.gallery.length))){
+    const lbl=en.placeholderLabel||({video:'VIDEO PRÓXIMAMENTE',image:'FOTO PRÓXIMAMENTE',media:'MEDIA PRÓXIMAMENTE',gallery:'GALERÍA EN CONSTRUCCIÓN'})[en.mediaType]||'MEDIA PRÓXIMAMENTE';
+    const icon={video:'🎬',image:'🖼️',media:'🎞️',gallery:'📼'}[en.mediaType]||'🎬';
+    return `<div class="mph"><span class="cam">${icon}</span><span>${lbl}</span></div>`;
+  }
+  if(en.mediaType==='gallery'&&en.gallery&&en.gallery.length){
+    /* swipeable, en orden de subida; cada imagen abre el lightbox con zoom */
+    return `<div class="gal">${en.gallery.map(g=>
+      g.type==='video'
+        ?`<video controls preload="metadata" src="${g.src}"></video>`
+        :`<img src="${g.src}" alt="${(g.cap||en.title).replace(/"/g,'&quot;')}" data-cap="${(g.cap||'').replace(/"/g,'&quot;')}" loading="lazy">`
+    ).join('')}</div>
+    <div class="mcap">Desliza para ver más · toca un meme para hacer zoom 🔍</div>`;
+  }
+  if(en.videoUrl){
+    const yt=en.videoUrl.match(/(?:youtu\.be\/|v=|\/embed\/)([\w-]{6,})/);
+    if(yt)return `<iframe class="mframe" style="aspect-ratio:16/9" loading="lazy"
+      src="https://www.youtube-nocookie.com/embed/${yt[1]}${en.autoplay?'?autoplay=1':''}" allowfullscreen allow="autoplay; encrypted-media"></iframe>`;
+    return `<video class="mframe" style="aspect-ratio:16/9" controls preload="auto" playsinline
+      ${en.autoplay?'autoplay':''} ${en.thumbnail?`poster="${en.thumbnail}"`:''} src="${en.videoUrl}"></video>`;
+  }
+  if(en.imageUrl)return `<img class="mframe" style="height:auto" src="${en.imageUrl}" alt="${en.title}" loading="lazy">`;
+  return '';
+}
+
+function openCore593(it){
+  const en=it.core593, cat=CATMAP[it.catId], c=cat.colors;
+  const rel=(it.rel||[]);
+  modal.innerHTML=`
+    <span class="tag" style="background:linear-gradient(135deg,${c[0]},${c[1]})">${cat.emoji} +593 CORE</span>
+    <div class="emoji-big">${it.e||'✨'}</div>
+    <h2>${en.title.replace(/\n/g,'<br>')}</h2>
+    ${en.fullPhrase?`<p class="quote">${en.fullPhrase}</p>`:''}
+    ${en.translation?`<div class="meaning"><div class="mrow"><h5>🌍 TRADUCCIÓN</h5><p>${en.translation}</p></div></div>`:''}
+    ${core593Media(en)}
+    ${en.caption?`<div class="mcap">${en.caption}</div>`:''}
+    <p>${en.description||''}</p>
+    ${en.porQue?`<div class="meaning"><div class="mrow"><h5>🇪🇨 POR QUÉ LO RECONOCEMOS</h5><p>${en.porQue}</p></div></div>`:''}
+    ${en.sourceCredit?`<div class="mcap">Fuente: ${en.sourceCredit}</div>`:''}
+    ${rel.length?`<div class="related"><h4>Momentos relacionados</h4>
+      <div class="chips">${rel.map(t=>`<button class="chip" data-t="${t.replace(/"/g,'&quot;')}">${(BY_TITLE[t]?.e||'✨')} ${t}</button>`).join('')}</div></div>`:''}
+    <button class="close-btn" id="cb">Cerrar</button>`;
+  overlay.classList.add('show');
+  modal.querySelector('#cb').onclick=closeModal;
+  modal.querySelectorAll('.chip').forEach(ch=>ch.onclick=()=>openModal(ch.dataset.t));
+  wireGallery(modal);
+  /* reproducir de una: el clic en la burbuja cuenta como gesto del usuario */
+  if(en.autoplay){const v=modal.querySelector('video'); v&&v.play().catch(()=>{});}
+}
+
+/* ---------- galería: lightbox con zoom + protección anti-imagen-rota ---------- */
+const lightbox=$('lightbox'), lbImg=$('lbImg'), lbCap=$('lbCap');
+const lbPrev=$('lbPrev'), lbNext=$('lbNext');
+let lbGallery=null, lbIndex=0;   /* cuando hay galería (lugares): navegación con flechas/teclado/swipe */
+function openLightbox(src,cap,gallery=null,idx=0){
+  lbGallery=(gallery&&gallery.length>1)?gallery:null; lbIndex=idx;
+  lbImg.src=src; lbCap.textContent=cap||'';
+  lightbox.classList.remove('zoomed');
+  lightbox.classList.add('show');
+  lbPrev.classList.toggle('show',!!lbGallery);
+  lbNext.classList.toggle('show',!!lbGallery);
+}
+function lbShowAt(i){
+  if(!lbGallery)return;
+  lbIndex=(i+lbGallery.length)%lbGallery.length;
+  lbImg.src=lbGallery[lbIndex];
+}
+function closeLightbox(){lightbox.classList.remove('show');lbImg.src='';lbGallery=null;}
+lbImg.onclick=()=>lightbox.classList.toggle('zoomed');   /* toca: zoom in / out */
+$('lbClose').onclick=closeLightbox;
+lbPrev.onclick=e=>{e.stopPropagation();lbShowAt(lbIndex-1);};
+lbNext.onclick=e=>{e.stopPropagation();lbShowAt(lbIndex+1);};
+lightbox.addEventListener('click',e=>{if(e.target===lightbox||e.target.id==='lbScroll')closeLightbox();});
+/* swipe táctil dentro del lightbox cuando hay galería */
+(()=>{let sx=0;
+  lightbox.addEventListener('touchstart',e=>{sx=e.changedTouches[0].clientX;},{passive:true});
+  lightbox.addEventListener('touchend',e=>{
+    if(!lbGallery)return;
+    const dx=e.changedTouches[0].clientX-sx;
+    if(Math.abs(dx)>40)lbShowAt(lbIndex+(dx<0?1:-1));
+  },{passive:true});
+})();
+
+/* ---------- carta completa de un LUGAR (hero/galería + descripción + dato + mapa) ---------- */
+let placeHeroImgs=null, placeHeroIdx=0, placeHeroRender=null;   /* estado de la galería abierta, para flechas de teclado */
+function wirePlaceHero(container,imgs,title){
+  if(!imgs||!imgs.length){
+    placeHeroImgs=null;
+    container.innerHTML=`<div class="pc-broken"><span class="cam">📷</span><span>Aún no hay foto para ${title}</span></div>`;
+    return;
+  }
+  placeHeroImgs=imgs; placeHeroIdx=0;
+  const render=()=>{
+    const idx=placeHeroIdx, multi=imgs.length>1;
+    container.innerHTML=`<div class="pc-loading"><span class="cam">🖼️</span><span>Cargando…</span></div>
+      <img src="${imgs[idx]}" alt="${title.replace(/"/g,'&quot;')}" loading="lazy">
+      ${multi?`<button class="pcard-arrow prev" aria-label="Anterior">‹</button>
+        <button class="pcard-arrow next" aria-label="Siguiente">›</button>
+        <div class="pcard-counter">${idx+1} / ${imgs.length}</div>`:''}`;
+    const img=container.querySelector('img'), loading=container.querySelector('.pc-loading');
+    img.onload=()=>loading&&loading.remove();
+    img.onerror=()=>{                          /* nunca dejar el ícono roto: placeholder intencional */
+      loading&&loading.remove();
+      const broken=document.createElement('div');
+      broken.className='pc-broken';
+      broken.innerHTML=`<span class="cam">📷</span><span>Falta el archivo<br>${imgs[idx].split('/').slice(-2).join('/')}</span>`;
+      img.replaceWith(broken);
+    };
+    img.onclick=()=>openLightbox(imgs[idx],title,imgs,idx);
+    if(multi){
+      container.querySelector('.prev').onclick=e=>{e.stopPropagation();placeHeroIdx=(idx-1+imgs.length)%imgs.length;render();};
+      container.querySelector('.next').onclick=e=>{e.stopPropagation();placeHeroIdx=(idx+1)%imgs.length;render();};
+    }
+  };
+  placeHeroRender=render;
+  render();
+  /* swipe táctil sobre el hero (sin reescribir el lightbox) */
+  let sx=0;
+  container.ontouchstart=e=>{sx=e.changedTouches[0].clientX;};
+  container.ontouchend=e=>{
+    if(!placeHeroImgs||placeHeroImgs.length<2)return;
+    const dx=e.changedTouches[0].clientX-sx;
+    if(Math.abs(dx)>40){placeHeroIdx=(placeHeroIdx+(dx<0?1:-1)+imgs.length)%imgs.length;render();}
+  };
+}
+function openPlaceCard(it){
+  const cat=CATMAP[it.catId], c=cat.colors;
+  modal.innerHTML=`
+    <span class="tag" style="background:linear-gradient(135deg,${c[0]},${c[1]})">${cat.emoji} ${cat.label.replace(/<br>/g,' ')}</span>
+    <div class="pcard-hero" id="pcHero"></div>
+    <h2>${it.e||'📍'} ${it.t}</h2>
+    <p>${it.d||descOf(it)}</p>
+    <div class="pcard-fact"><h5>💡 Dato interesante</h5><p>${it.fact||'Dato pendiente — edítalo en DATA.lugares.'}</p></div>
+    ${RENDER.map(it)}
+    <button class="close-btn" id="cb">Cerrar</button>`;
+  overlay.classList.add('show');
+  modal.querySelector('#cb').onclick=closeModal;
+  wirePlaceHero(modal.querySelector('#pcHero'),it.images,it.t);
+}
+
+/* ---------- carta completa de MADE IN ECU (foto + nombre + descripción, sin mapa ni tabs) ---------- */
+function openMadeInCard(it){
+  const cat=CATMAP[it.catId], c=cat.colors;
+  modal.innerHTML=`
+    <span class="tag" style="background:linear-gradient(135deg,${c[0]},${c[1]})">${cat.emoji} ${cat.label.replace(/<br>/g,' ')}</span>
+    <div class="pcard-hero" id="miHero"></div>
+    <h2>${it.t}</h2>
+    <p>${it.d||descOf(it)}</p>
+    <button class="close-btn" id="cb">Cerrar</button>`;
+  overlay.classList.add('show');
+  modal.querySelector('#cb').onclick=closeModal;
+  wirePlaceHero(modal.querySelector('#miHero'),it.img?[it.img]:[],it.t);
+}
+
+/* ---------- carta completa de un PLATO (foto + nombre + región + descripción + dato, sin mapa ni tabs) ----------
+   Hero propio, sin íconos de emoji (a diferencia de wirePlaceHero), por pedido explícito para esta sala. */
+function wireFoodHero(container,imgs,title){
+  if(!imgs||!imgs.length){
+    container.innerHTML=`<div class="pc-broken"><span>Fotografía pendiente para ${title}</span></div>`;
+    return;
+  }
+  const src=imgs[0];
+  container.innerHTML=`<div class="pc-loading"><span>Cargando…</span></div>
+    <img src="${src}" alt="${title.replace(/"/g,'&quot;')}" loading="lazy">`;
+  const img=container.querySelector('img'), loading=container.querySelector('.pc-loading');
+  img.onload=()=>loading&&loading.remove();
+  img.onerror=()=>{                          /* nunca dejar el ícono roto: reemplazo limpio, sin emojis */
+    loading&&loading.remove();
+    const broken=document.createElement('div');
+    broken.className='pc-broken';
+    broken.innerHTML=`<span>Falta el archivo<br>${src.split('/').slice(-2).join('/')}</span>`;
+    img.replaceWith(broken);
+  };
+  img.onclick=()=>openLightbox(src,title);
+}
+function openComidaCard(it){
+  const cat=CATMAP[it.catId], c=cat.colors;
+  modal.innerHTML=`
+    <span class="tag" style="background:linear-gradient(135deg,${c[0]},${c[1]})">${cat.label.replace(/<br>/g,' ')}</span>
+    <div class="pcard-hero" id="gcHero"></div>
+    <h2>${it.t}</h2>
+    ${it.region?`<div class="pcard-region">${it.region}</div>`:''}
+    <p>${it.d||descOf(it)}</p>
+    <div class="pcard-fact food"><h5>Dato curioso</h5><p>${it.fact||'Dato pendiente — edítalo en DATA.comida.'}</p></div>
+    <button class="close-btn" id="cb">Cerrar</button>`;
+  overlay.classList.add('show');
+  modal.querySelector('#cb').onclick=closeModal;
+  wireFoodHero(modal.querySelector('#gcHero'),it.img?[it.img]:[],it.t);
+}
+
+function wireGallery(scope){
+  scope.querySelectorAll('.gal img').forEach(im=>{
+    im.onclick=()=>openLightbox(im.src,im.dataset.cap);
+    im.onerror=()=>{  /* nunca dejar el ícono roto: placeholder intencional */
+      const ph=document.createElement('div');
+      ph.className='galph';
+      ph.innerHTML=`<span class="cam">📷</span><span>Falta el archivo<br>${im.src.split('/').slice(-2).join('/')}</span>`;
+      im.replaceWith(ph);
+    };
+  });
+}
+
+/* ---------- modal de contenido (multimedia) ---------- */
+const overlay=$('overlay'), modal=$('modal');
+function openModal(title){
+  const it=BY_TITLE[title]; if(!it)return;
+  if(it.core593){openCore593(it);return;}   /* los momentos virales tienen su propia carta */
+  if(it.catId==='lugares'){openPlaceCard(it);return;}   /* LUGARES: carta de destino (hero/galería + dato + mapa) */
+  if(it.catId==='madein'){openMadeInCard(it);return;}   /* MADE IN ECU: foto + nombre + descripción, sin mapa ni tabs */
+  if(it.catId==='comida'){openComidaCard(it);return;}   /* GASTRONOMÍA: foto + nombre + región + descripción + dato */
+  const cat=CATMAP[it.catId], c=cat.colors;
+  const rel=relOf(it);
+  const hasReal=id=>!!(it.media&&it.media[id]&&(!Array.isArray(it.media[id])||it.media[id].length));
+
+  /* tipo de carta: el item manda, luego su categoría */
+  const mode=it.modal||cat.modal||'media';
+  /* categorías media → los 7 tabs (con placeholders);
+     categorías texto → sin tabs, salvo los medios reales que ese item tenga */
+  const tabs=(mode==='media') ? MEDIA_TYPES : MEDIA_TYPES.filter(m=>hasReal(m.id));
+
+  const mediaHTML=tabs.length?`
+    <div class="mtabs">${tabs.map(m=>
+      `<button class="mtab" data-m="${m.id}">${m.icon} ${m.name}${hasReal(m.id)?'<span class="dotlive"></span>':''}</button>`
+    ).join('')}</div>
+    <div class="mbody" id="mbody"></div>`:'';
+
+  /* cartas de texto:
+     - con mundo/ecuador → carta editorial de expresión (solo los bloques que existan)
+     - solo con d (hábitos) → carta corta: título + explicación, sin bloques
+     - sin nada → placeholders para editar después */
+  let textoHTML='';
+  if(mode==='texto'){
+    if(it.mundo||it.ecuador){
+      textoHTML='<div class="meaning">'
+        +(it.mundo?`<div class="mrow"><h5>🌍 PARA EL RESTO DEL MUNDO</h5><p>${it.mundo}</p></div>`:'')
+        +(it.ecuador?`<div class="mrow"><h5>🇪🇨 EN ECUADOR...</h5><p>${it.ecuador}</p></div>`:'')
+        +'</div>';
+    }else if(!it.d){
+      textoHTML=`<div class="meaning">
+        <div class="mrow"><h5>🌍 PARA EL RESTO DEL MUNDO</h5><p>Texto placeholder — la traducción corta que cualquiera entiende. Edita el campo <b>mundo</b> en DATA.</p></div>
+        <div class="mrow"><h5>🇪🇨 EN ECUADOR...</h5><p>Texto placeholder — cómo la usamos de verdad. Edita el campo <b>ecuador</b> en DATA.</p></div>
+      </div>`;
+    }
+  }
+  /* en cartas de texto la frase es la protagonista: sin párrafo de relleno */
+  const descHTML=(mode==='texto'&&!it.d)?'':`<p>${descOf(it)}</p>`;
+
+  modal.innerHTML=`
+    <span class="tag" style="background:linear-gradient(135deg,${c[0]},${c[1]})">${cat.emoji} ${cat.label.replace(/<br>/g,' ')}</span>
+    <div class="emoji-big">${it.e||'✨'}</div>
+    <h2>${it.t}</h2>
+    ${mediaHTML}
+    ${descHTML}
+    ${textoHTML}
+    <div class="related">
+      <h4>Burbujas relacionadas</h4>
+      <div class="chips">${rel.map(t=>`<button class="chip" data-t="${t}">${(BY_TITLE[t]?.e||'✨')} ${t}</button>`).join('')}</div>
+    </div>
+    <button class="close-btn" id="cb">Cerrar</button>`;
+
+  if(tabs.length){
+    const mbody=modal.querySelector('#mbody');
+    const showTab=id=>{
+      mbody.innerHTML=RENDER[id](it);
+      modal.querySelectorAll('.mtab').forEach(b=>b.classList.toggle('on',b.dataset.m===id));
+      if(id==='pinterest'&&window.PinUtils)setTimeout(()=>window.PinUtils.build(mbody),60);
+      if(id==='gallery')wireGallery(mbody);
+    };
+    showTab((tabs.find(m=>hasReal(m.id))||tabs[0]).id);
+    modal.querySelectorAll('.mtab').forEach(b=>b.onclick=()=>showTab(b.dataset.m));
+  }
+
+  overlay.classList.add('show');
+  modal.querySelector('#cb').onclick=closeModal;
+  modal.querySelectorAll('.chip').forEach(ch=>ch.onclick=()=>openModal(ch.dataset.t));
+}
+function closeModal(){
+  modal.querySelectorAll('video').forEach(v=>v.pause());  /* que no siga sonando de fondo */
+  overlay.classList.remove('show');
+  placeHeroImgs=null; placeHeroRender=null;
+}
+overlay.addEventListener('click',e=>{if(e.target===overlay)closeModal();});
+document.addEventListener('keydown',e=>{
+  if(lightbox.classList.contains('show')&&lbGallery&&(e.key==='ArrowLeft'||e.key==='ArrowRight')){
+    lbShowAt(lbIndex+(e.key==='ArrowRight'?1:-1)); return;
+  }
+  if(!lightbox.classList.contains('show')&&overlay.classList.contains('show')&&placeHeroImgs&&placeHeroImgs.length>1&&(e.key==='ArrowLeft'||e.key==='ArrowRight')){
+    placeHeroIdx=(placeHeroIdx+(e.key==='ArrowRight'?1:-1)+placeHeroImgs.length)%placeHeroImgs.length;
+    placeHeroRender(); return;
+  }
+  if(e.key!=='Escape')return;
+  if(lightbox.classList.contains('show'))closeLightbox();      /* zoom → carta → sala → lobby */
+  else if(overlay.classList.contains('show'))closeModal();
+  else if(phase==='room')exitRoom();
+});
+
+/* ================== BOTONES ================== */
+$('shuffle').onclick=()=>{
+  if(!engine||phase!=='universe')return;
+  navigator.vibrate&&navigator.vibrate(20);
+  /* nuevo orden orbital: cada categoría recibe otra posición alrededor de Ecuador */
+  const cats=[...bubbles.values()].filter(o=>o.kind==='category');
+  if(!cats.length)return;
+  const slots=cats.map(o=>o.ang);
+  for(let i=slots.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[slots[i],slots[j]]=[slots[j],slots[i]];}
+  cats.forEach((o,i)=>{o.ang=slots[i];o.freeUntil=0;});
+  showHint('¡Nuevo orden orbital! 🔀');
+};
+$('more').onclick=()=>{
+  /* sala sorpresa: el museo te lleva a una exhibición al azar */
+  if(phase!=='universe')return;
+  const doors=[...bubbles.values()].filter(o=>o.kind==='category');
+  if(!doors.length)return;
+  const pick=doors[(Math.random()*doors.length)|0];
+  showHint('Sala sorpresa 🎲');
+  setTimeout(()=>enterRoom(pick),400);
+};
+
+/* ================== hint ================== */
+let hintTimer;
+function showHint(msg){
+  hintEl.textContent=msg; hintEl.classList.add('show');
+  clearTimeout(hintTimer);
+  hintTimer=setTimeout(()=>hintEl.classList.remove('show'),3600);
+}
+
+/* ================== ISLAS GALÁPAGOS — el Easter egg final ==================
+   NO es una sala, NO es una categoría, NO abre cartas ni burbujas.
+   Secuencia SIEMPRE idéntica, sin aleatoriedad:
+   1) ligero zoom de cámara hacia las islas → 2) aparece la mascota →
+   3) las 4 frases se muestran una tras otra, en este orden exacto, ~2s cada una,
+   con la mascota siempre visible → 4) la mascota se despide con un rebote,
+   se desvanece, y la cámara vuelve sola al home exactamente como estaba.
+   Ni un clic extra requerido. */
+const galWelcome=$('galWelcome'), gwCard=galWelcome.querySelector('.gw-card'),
+      gwMascot=$('gwMascot'), gwBubble=$('gwBubble');
+const GAL_MASCOT_IMG='media/galapagos/mascota.jpg';   /* mascota existente en media/Galápagos/ */
+const GAL_LINES=[            /* orden fijo, siempre el mismo, nunca al azar */
+  'Oe ñaño 👋',
+  'Ponte pilas y ven a nuestra tierrita 🇪🇨',
+  'Aquí hay encebollado para regalar y amor para dar ❤️',
+  'Recuerda que... ¡CHULLA VIDA!'
+];
+const GAL_LINE_MS=2000;       /* ~2s por frase, como se pidió */
+
+/* punto focal del archipiélago dentro del propio viewBox del SVG (fracción de ancho/alto),
+   calculado a partir de las islas ya dibujadas en #sil — el viewBox y la silueta del
+   continente NO se tocan, solo se usa este punto como pivote de la cámara. */
+const GAL_FOCAL_FX=-0.23, GAL_FOCAL_FY=1.02;
+const GAL_ZOOM=1.5;   /* zoom SUTIL hacia Galápagos, nunca una sala a pantalla completa */
+
+let galBusy=false;
+function galapagosCamera(zoomIn){
+  const silW=parseFloat(sil.style.width)||ORBIT.silW;
+  const silH=silW*296/268;      /* proporción exacta del viewBox: nunca se distorsiona */
+  sil.style.transformOrigin=`${GAL_FOCAL_FX*100}% ${GAL_FOCAL_FY*100}%`;
+  sil.style.transition='left .9s cubic-bezier(.6,.05,.3,1), top .9s cubic-bezier(.6,.05,.3,1), transform .9s cubic-bezier(.6,.05,.3,1)';
+  if(zoomIn){
+    sil.style.left=(W()/2 - silW*(GAL_FOCAL_FX-0.5))+'px';
+    sil.style.top =(H()/2 - silH*(GAL_FOCAL_FY-0.5))+'px';
+    sil.style.transform=`translate(-50%,-50%) scale(${GAL_ZOOM})`;
+  }else{
+    sil.style.left=W()/2+'px';
+    sil.style.top=H()/2+'px';
+    sil.style.transform='translate(-50%,-50%) scale(1)';   /* mapa principal, exactamente como estaba */
+    setTimeout(()=>{ if(!galBusy)sil.style.transformOrigin=''; },950);
+  }
+}
+function triggerGalapagos(){
+  if(phase!=='universe'||galBusy)return;      /* siempre la misma secuencia, sin variantes */
+  galBusy=true;
+  navigator.vibrate&&navigator.vibrate(20);
+  galapagosCamera(true);                       /* 1. ligero zoom de cámara */
+
+  setTimeout(()=>{
+    gwCard.classList.remove('bye');
+    gwMascot.src=GAL_MASCOT_IMG;                /* 2. mascota (siempre la misma imagen) */
+    galWelcome.classList.add('show');
+    navigator.vibrate&&navigator.vibrate(15);
+
+    let i=0;
+    const showLine=()=>{ gwBubble.textContent=GAL_LINES[i]; };  /* 3. frases en orden fijo */
+    showLine();
+    const lineTimer=setInterval(()=>{
+      i++;
+      if(i<GAL_LINES.length){ showLine(); return; }
+      clearInterval(lineTimer);
+      gwCard.classList.add('bye');              /* 4. despedida: rebote + desvanece */
+      setTimeout(()=>{
+        galWelcome.classList.remove('show');
+        gwCard.classList.remove('bye');
+        galapagosCamera(false);                 /* cámara regresa sola, sin clics extra */
+        setTimeout(()=>{ galBusy=false; },950);
+      },420);
+    },GAL_LINE_MS);
+  },550);
+}
+const galHit=document.querySelector('#sil .galapagos-hit');
+if(galHit)galHit.addEventListener('click',e=>{
+  e.stopPropagation();
+  triggerGalapagos();
+});
+
+initSpace();
+</script>
+</body>
+</html>
